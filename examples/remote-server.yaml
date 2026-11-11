@@ -1,0 +1,8 @@
+schema_version: 1
+name: remote-example
+kind: remote
+title: Remote example
+description: Example of an MCP-over-HTTP endpoint.
+enabled: true
+remote:
+  url: https://example.com/mcp

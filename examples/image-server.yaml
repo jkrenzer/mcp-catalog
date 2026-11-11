@@ -1,0 +1,7 @@
+schema_version: 1
+name: image-example
+kind: image
+title: Image example
+description: Example of an immutable image-based MCP server.
+enabled: true
+image: ghcr.io/example/server@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

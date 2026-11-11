@@ -1,0 +1,336 @@
+{
+  "$defs": {
+    "BuildOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "platforms": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Platforms",
+          "type": "array"
+        },
+        "args": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Args",
+          "type": "object"
+        }
+      },
+      "title": "BuildOptions",
+      "type": "object"
+    },
+    "BuildServer": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "const": "build",
+          "title": "Kind",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "runtime": {
+          "additionalProperties": true,
+          "title": "Runtime",
+          "type": "object"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceModel"
+            },
+            {
+              "$ref": "#/$defs/LocalSourceModel"
+            }
+          ],
+          "title": "Source"
+        },
+        "build": {
+          "$ref": "#/$defs/BuildOptions"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "kind",
+        "title",
+        "description",
+        "source",
+        "build"
+      ],
+      "title": "BuildServer",
+      "type": "object"
+    },
+    "ImageServer": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "const": "image",
+          "title": "Kind",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "runtime": {
+          "additionalProperties": true,
+          "title": "Runtime",
+          "type": "object"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "image": {
+          "title": "Image",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "kind",
+        "title",
+        "description",
+        "image"
+      ],
+      "title": "ImageServer",
+      "type": "object"
+    },
+    "LocalSourceModel": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "format": "directory-path",
+          "title": "Context",
+          "type": "string"
+        },
+        "dockerfile": {
+          "format": "file-path",
+          "title": "Dockerfile",
+          "type": "string"
+        }
+      },
+      "required": [
+        "context",
+        "dockerfile"
+      ],
+      "title": "LocalSourceModel",
+      "type": "object"
+    },
+    "RemoteEndpoint": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "RemoteEndpoint",
+      "type": "object"
+    },
+    "RemoteServer": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "const": "remote",
+          "title": "Kind",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "runtime": {
+          "additionalProperties": true,
+          "title": "Runtime",
+          "type": "object"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "remote": {
+          "$ref": "#/$defs/RemoteEndpoint"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "kind",
+        "title",
+        "description",
+        "remote"
+      ],
+      "title": "RemoteServer",
+      "type": "object"
+    },
+    "SourceModel": {
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        },
+        "revision": {
+          "pattern": "^[a-fA-F0-9]{40}$",
+          "title": "Revision",
+          "type": "string"
+        },
+        "context": {
+          "default": ".",
+          "title": "Context",
+          "type": "string"
+        },
+        "dockerfile": {
+          "default": "Dockerfile",
+          "title": "Dockerfile",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "revision"
+      ],
+      "title": "SourceModel",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "name": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Name",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "servers_dir": {
+      "default": "servers",
+      "title": "Servers Dir",
+      "type": "string"
+    },
+    "servers": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "build": "#/$defs/BuildServer",
+            "image": "#/$defs/ImageServer",
+            "remote": "#/$defs/RemoteServer"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/BuildServer"
+          },
+          {
+            "$ref": "#/$defs/ImageServer"
+          },
+          {
+            "$ref": "#/$defs/RemoteServer"
+          }
+        ]
+      },
+      "title": "Servers",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "name",
+    "title",
+    "description"
+  ],
+  "title": "CatalogModel",
+  "type": "object"
+}

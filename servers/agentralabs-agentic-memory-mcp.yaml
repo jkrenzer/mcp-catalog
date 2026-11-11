@@ -1,0 +1,15 @@
+schema_version: 1
+name: agentralabs-agentic-memory-mcp
+kind: build
+title: Agentralabs Agentic Memory MCP
+description: >
+  Persistent cognitive graph memory for AI agents — facts,
+  decisions, reasoning chains, corrections. 16 query
+  types, sub-millisecond.
+enabled: true
+source:
+  context: ./agentralabs-agentic-memory-mcp
+  dockerfile: Dockerfile
+build:
+  platforms: [linux/amd64]
+  args: {}

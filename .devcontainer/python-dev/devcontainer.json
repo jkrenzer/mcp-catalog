@@ -1,0 +1,28 @@
+{
+  "name": "Python Development",
+  "build": {
+    "dockerfile": "../../Dockerfile",
+    "context": "../..",
+    "target": "development",
+    "args": {
+      "WORKSPACE_DIR": "${containerWorkspaceFolder}"
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "installDockerBuildx": true
+    }
+  },
+  "overrideCommand": true,
+  "shutdownAction": "stopContainer",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/venv/bin/python"
+      },
+      "extensions": [
+        "ms-python.python"
+      ]
+    }
+  }
+}

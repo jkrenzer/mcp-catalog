@@ -1,0 +1,473 @@
+from __future__ import annotations
+
+import asyncio
+import json
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+import mcp_catalog.cli as cli
+from mcp_catalog import get_logger
+from mcp_catalog.cli import app, main
+from mcp_catalog.interfaces.builds import _run
+from mcp_catalog.interfaces.docker_catalog import publish_catalog
+from mcp_catalog.io.yaml import dump_yaml_file
+from mcp_catalog.models import BuildServer, GitSourceModel
+from mcp_catalog.workflows import (
+    build_plan,
+    build_server_image,
+    docker_catalog,
+    load_catalog,
+    schema_drift,
+    write_schemas,
+)
+
+runner = CliRunner()
+
+
+def _build_server(name: str, *, enabled: bool = True) -> dict[str, object]:
+    return {
+        'schema_version': 1,
+        'name': name,
+        'kind': 'build',
+        'title': name.title(),
+        'description': f'{name} server',
+        'enabled': enabled,
+        'source': {
+            'repository': 'https://github.com/example/server.git',
+            'revision': '0123456789abcdef0123456789abcdef01234567',
+            'context': '.',
+            'dockerfile': 'Dockerfile',
+        },
+        'build': {
+            'platforms': ['linux/amd64'],
+            'args': {'ZED': 'last', 'ALPHA': 'first'},
+        },
+    }
+
+
+def _write_catalog(path, servers: list[dict[str, object]]) -> None:
+    dump_yaml_file(
+        path,
+        {
+            'schema_version': 1,
+            'name': 'test-catalog',
+            'title': 'Test Catalog',
+            'description': 'Catalog used by CLI tests.',
+            'servers': servers,
+        },
+    )
+
+
+def test_validate_accepts_catalog_with_embedded_servers(tmp_path):
+    catalog = tmp_path / 'catalog.yaml'
+    _write_catalog(catalog, [_build_server('example')])
+
+    result = runner.invoke(app, ['validate', str(catalog)])
+
+    assert result.exit_code == 0
+    assert result.stdout == ''
+    assert 'Validated' in result.stderr
+
+
+def test_schema_generate_and_check(tmp_path):
+    result = runner.invoke(app, ['schema', 'generate', str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert schema_drift(tmp_path) == []
+    assert (tmp_path / 'server.schema.json').is_file()
+
+
+def test_committed_schemas_are_current():
+    schema_dir = Path(__file__).parents[1] / 'schemas'
+
+    assert schema_drift(schema_dir) == []
+
+
+def test_schema_check_reports_drift(tmp_path):
+    write_schemas(tmp_path)
+    (tmp_path / 'server.schema.json').write_text('{}\n', encoding='utf-8')
+
+    result = runner.invoke(app, ['schema', 'check', str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert 'out of date' in result.output
+
+
+def test_server_crud_updates_embedded_catalog(tmp_path):
+    catalog = tmp_path / 'catalog.yaml'
+    source = tmp_path / 'new-server.yaml'
+    _write_catalog(catalog, [_build_server('original')])
+    dump_yaml_file(source, _build_server('added'))
+
+    add_result = runner.invoke(app, ['server', 'add', str(catalog), '--manifest', str(source)])
+    list_result = runner.invoke(app, ['server', 'list', str(catalog)])
+    show_result = runner.invoke(app, ['server', 'show', 'added', str(catalog)])
+    remove_result = runner.invoke(app, ['server', 'remove', 'added', str(catalog)])
+
+    assert add_result.exit_code == 0, add_result.output
+    assert list_result.exit_code == 0
+    assert 'added\tbuild\tenabled' in list_result.stdout
+    assert show_result.exit_code == 0
+    assert 'name: added' in show_result.stdout
+    assert remove_result.exit_code == 0
+    assert [server.name for server in load_catalog(catalog).servers] == ['original']
+
+
+def test_server_crud_updates_catalog_server_files(tmp_path):
+    catalog = tmp_path / 'catalog.yaml'
+    servers_dir = tmp_path / 'servers'
+    servers_dir.mkdir()
+    dump_yaml_file(
+        catalog,
+        {
+            'schema_version': 1,
+            'name': 'test-catalog',
+            'title': 'Test Catalog',
+            'description': 'Catalog used by CLI tests.',
+            'servers_dir': 'servers',
+        },
+    )
+    dump_yaml_file(servers_dir / 'original.yaml', _build_server('original'))
+    source = tmp_path / 'new-server.yaml'
+    dump_yaml_file(source, _build_server('added'))
+
+    add_result = runner.invoke(app, ['server', 'add', str(catalog), '--manifest', str(source)])
+    assert add_result.exit_code == 0, add_result.output
+    assert (servers_dir / 'added.yaml').is_file()
+
+    remove_result = runner.invoke(app, ['server', 'remove', 'added', str(catalog)])
+
+    assert remove_result.exit_code == 0, remove_result.output
+    assert not (servers_dir / 'added.yaml').exists()
+    assert [server.name for server in load_catalog(catalog).servers] == ['original']
+
+
+def test_upstream_resolve_is_read_only_and_update_is_explicit(tmp_path, monkeypatch):
+    catalog = tmp_path / 'catalog.yaml'
+    servers_dir = tmp_path / 'servers'
+    servers_dir.mkdir()
+    dump_yaml_file(
+        catalog,
+        {
+            'schema_version': 1,
+            'name': 'test-catalog',
+            'title': 'Test Catalog',
+            'description': 'Catalog used by CLI tests.',
+            'servers_dir': 'servers',
+        },
+    )
+    server_path = servers_dir / 'example.yaml'
+    dump_yaml_file(server_path, _build_server('example'))
+    updated_revision = 'abcdef0123456789abcdef0123456789abcdef01'
+    monkeypatch.setattr(
+        'mcp_catalog.interfaces.upstream.resolve_upstream_revision',
+        lambda repository, ref: updated_revision,
+    )
+
+    resolved = runner.invoke(app, ['upstream', 'resolve', 'example', str(catalog), '--ref', 'main'])
+
+    assert resolved.exit_code == 0
+    assert resolved.stdout.strip() == updated_revision
+    resolved_server = load_catalog(catalog).servers[0]
+    assert isinstance(resolved_server, BuildServer)
+    assert isinstance(resolved_server.source, GitSourceModel)
+    assert resolved_server.source.revision == '0123456789abcdef0123456789abcdef01234567'
+
+    updated = runner.invoke(app, ['upstream', 'update', 'example', str(catalog), '--ref', 'main'])
+
+    assert updated.exit_code == 0, updated.output
+    updated_server = load_catalog(catalog).servers[0]
+    assert isinstance(updated_server, BuildServer)
+    assert isinstance(updated_server.source, GitSourceModel)
+    assert updated_server.source.revision == updated_revision
+
+
+def test_build_plan_is_name_and_argument_sorted(tmp_path):
+    catalog_path = tmp_path / 'catalog.yaml'
+    _write_catalog(catalog_path, [_build_server('zulu'), _build_server('alpha')])
+    catalog = load_catalog(catalog_path)
+
+    first = build_plan(catalog, catalog_commit='deadbeef', branch='main')
+    second = build_plan(catalog, catalog_commit='deadbeef', branch='main')
+
+    assert first == second
+    assert [build['name'] for build in first['builds']] == ['alpha', 'zulu']
+    assert first['builds'][0]['args'] == {'ALPHA': 'first', 'ZED': 'last'}
+
+
+def test_local_build_plan_and_image_build_use_local_context(tmp_path, monkeypatch):
+    context = tmp_path / 'local-context'
+    context.mkdir()
+    dockerfile = context / 'Dockerfile'
+    dockerfile.write_text('FROM scratch\n', encoding='utf-8')
+    catalog_path = tmp_path / 'catalog.yaml'
+    server = _build_server('example')
+    server['source'] = {'context': 'local-context', 'dockerfile': 'Dockerfile'}
+    _write_catalog(catalog_path, [server])
+    catalog = load_catalog(catalog_path)
+    server_model = catalog.servers[0]
+    assert isinstance(server_model, BuildServer)
+    commands = []
+    monkeypatch.setattr(
+        'mcp_catalog.interfaces.builds._run',
+        lambda command, **kwargs: commands.append(command),
+    )
+
+    plan = build_plan(catalog, catalog_commit='deadbeef', branch='main')
+    build_server_image(server_model, image='example/local:latest', platform='linux/amd64')
+
+    source = plan['builds'][0]['source']
+    assert source == {
+        'type': 'local',
+        'context': str(context),
+        'dockerfile': str(dockerfile),
+    }
+    assert len(commands) == 1
+    assert commands[0][0:3] == ['docker', 'buildx', 'build']
+    assert commands[0][-1] == str(context)
+    assert commands[0][commands[0].index('--file') + 1] == str(dockerfile)
+
+
+def test_image_build_push_uses_all_platforms_and_build_cache(tmp_path, monkeypatch):
+    context = tmp_path / 'local-context'
+    context.mkdir()
+    (context / 'Dockerfile').write_text('FROM scratch\n', encoding='utf-8')
+    catalog_path = tmp_path / 'catalog.yaml'
+    server = _build_server('example')
+    server['source'] = {'context': 'local-context', 'dockerfile': 'Dockerfile'}
+    server['build'] = {'platforms': ['linux/amd64', 'linux/arm64'], 'args': {}}
+    _write_catalog(catalog_path, [server])
+    catalog = load_catalog(catalog_path)
+    model = catalog.servers[0]
+    assert isinstance(model, BuildServer)
+    commands = []
+    monkeypatch.setattr(
+        'mcp_catalog.interfaces.builds._run',
+        lambda command, **kwargs: commands.append(command),
+    )
+
+    build_server_image(
+        model,
+        image='example/local:latest',
+        push=True,
+        cache_from='type=gha,scope=example',
+        cache_to='type=gha,scope=example,mode=max',
+    )
+
+    command = commands[0]
+    assert '--push' in command
+    assert '--load' not in command
+    assert command[command.index('--platform') + 1] == 'linux/amd64,linux/arm64'
+    assert command[command.index('--cache-from') + 1] == 'type=gha,scope=example'
+    assert command[command.index('--cache-to') + 1] == 'type=gha,scope=example,mode=max'
+
+
+def test_docker_build_does_not_inherit_git_credentials(monkeypatch):
+    observed = {}
+
+    def run(command, **kwargs):
+        observed.update(kwargs)
+
+    monkeypatch.setenv('GIT_CONFIG_VALUE_0', 'AUTHORIZATION: basic sensitive')
+    monkeypatch.setattr('mcp_catalog.interfaces.builds.subprocess.run', run)
+
+    _run(['docker', 'buildx', 'build'])
+
+    assert 'GIT_CONFIG_VALUE_0' not in observed['env']
+
+
+def test_catalog_publish_accepts_buildx_cache_options(monkeypatch):
+    commands = []
+    monkeypatch.setattr(
+        'mcp_catalog.interfaces.docker_catalog._run',
+        lambda command: commands.append(command),
+    )
+
+    publish_catalog(
+        {'version': 2, 'registry': {}},
+        'ghcr.io/example/catalog:latest',
+        cache_from='type=gha,scope=catalog',
+        cache_to='type=gha,scope=catalog,mode=max',
+    )
+
+    command = commands[0]
+    assert '--push' in command
+    assert command[command.index('--cache-from') + 1] == 'type=gha,scope=catalog'
+    assert command[command.index('--cache-to') + 1] == 'type=gha,scope=catalog,mode=max'
+
+
+def test_docker_catalog_excludes_disabled_servers(tmp_path):
+    catalog_path = tmp_path / 'catalog.yaml'
+    _write_catalog(
+        catalog_path, [_build_server('enabled'), _build_server('disabled', enabled=False)]
+    )
+
+    document = docker_catalog(
+        load_catalog(catalog_path), images={'enabled': 'example/enabled:latest'}
+    )
+
+    assert list(document['registry']) == ['enabled']
+    assert document['registry']['enabled']['image'] == 'example/enabled:latest'
+    assert document['registry']['enabled']['type'] == 'server'
+    assert document['registry']['enabled']['ref'] == '0123456789abcdef0123456789abcdef01234567'
+
+
+def test_docker_catalog_uses_docker_remote_entry_shape(tmp_path):
+    catalog_path = tmp_path / 'catalog.yaml'
+    remote = {
+        'schema_version': 1,
+        'name': 'remote-example',
+        'kind': 'remote',
+        'title': 'Remote example',
+        'description': 'Remote server',
+        'remote': {'url': 'https://example.com/mcp'},
+    }
+    _write_catalog(catalog_path, [remote])
+
+    document = docker_catalog(load_catalog(catalog_path))
+    entry = document['registry']['remote-example']
+
+    assert document['version'] == 2
+    assert entry['type'] == 'remote'
+    assert entry['remote'] == {
+        'transport_type': 'streamable-http',
+        'url': 'https://example.com/mcp',
+    }
+
+
+def test_plan_command_emits_parseable_json(tmp_path):
+    catalog_path = tmp_path / 'catalog.yaml'
+    _write_catalog(catalog_path, [_build_server('example')])
+
+    result = runner.invoke(
+        app,
+        [
+            'plan',
+            str(catalog_path),
+            '--catalog-commit',
+            '0123456789abcdef',
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)['builds'][0]['name'] == 'example'
+
+
+def test_log_file_options_support_default_and_per_file_levels(tmp_path):
+    catalog_path = tmp_path / 'catalog.yaml'
+    default_log = tmp_path / 'default.log'
+    debug_log = tmp_path / 'debug.log'
+    _write_catalog(catalog_path, [_build_server('example')])
+
+    result = runner.invoke(
+        app,
+        [
+            '--log-level',
+            'WARNING',
+            '--log-file',
+            str(default_log),
+            '--log-file',
+            f'DEBUG:{debug_log}',
+            'validate',
+            str(catalog_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout == ''
+    assert 'Validated' not in result.stderr
+    assert 'Validated' not in default_log.read_text(encoding='utf-8')
+    assert 'DEBUG mcp_catalog.interfaces.catalog: Validating manifest' in debug_log.read_text(
+        encoding='utf-8'
+    )
+    assert 'Validated' in debug_log.read_text(encoding='utf-8')
+
+
+def test_main_dumps_buffered_levels_if_logging_setup_fails(tmp_path, monkeypatch, capsys):
+    catalog_path = tmp_path / 'catalog.yaml'
+    _write_catalog(catalog_path, [_build_server('example')])
+    original_begin_buffering = cli.begin_buffering
+
+    def begin_with_record() -> None:
+        original_begin_buffering()
+        get_logger('test-before-cli-setup').debug('buffered before CLI setup')
+
+    monkeypatch.setattr(cli, 'begin_buffering', begin_with_record)
+
+    try:
+        main(['--log-level', 'INVALID', 'validate', str(catalog_path)])
+    except ValueError as error:
+        assert 'Unknown log level' in str(error)
+    else:
+        raise AssertionError('Expected invalid log-level setup to fail')
+
+    captured = capsys.readouterr()
+    assert 'DEBUG mcp_catalog.test-before-cli-setup: buffered before CLI setup' in captured.err
+
+
+def test_fastmcp_mirrors_public_cli_commands():
+    pytest.importorskip('fastmcp')
+    from mcp_catalog.mcp.server import load_tools
+
+    tools = asyncio.run(load_tools().list_tools())
+
+    assert {tool.name for tool in tools} == {
+        'validate',
+        'schema_generate',
+        'schema_check',
+        'server_list',
+        'server_show',
+        'server_add',
+        'server_update',
+        'server_remove',
+        'upstream_resolve',
+        'upstream_update',
+        'build_plan',
+        'image_build',
+        'image_publish',
+        'docker_server_entry',
+        'docker_catalog',
+        'catalog_publish',
+        'publication_inspect',
+        'branch_slug',
+    }
+
+
+def test_fastmcp_stdio_uses_protocol_stream_without_banner(monkeypatch):
+    pytest.importorskip('fastmcp')
+
+    from mcp_catalog.mcp import server
+
+    run_options = {}
+    monkeypatch.setattr(server.mcp, 'run', lambda **kwargs: run_options.update(kwargs))
+
+    server.serve_stdio()
+
+    assert run_options == {'transport': 'stdio', 'show_banner': False}
+
+
+def test_fastmcp_stdio_client_lists_and_calls_tools():
+    pytest.importorskip('fastmcp')
+
+    from fastmcp import Client
+    from fastmcp.client.transports import StdioTransport
+
+    async def verify() -> None:
+        transport = StdioTransport(
+            command='mcp-catalog',
+            args=['mcp', 'serve'],
+            cwd=str(Path(__file__).parents[1]),
+        )
+        async with Client(transport) as client:
+            tools = await client.list_tools()
+            result = await client.call_tool(
+                'branch_slug',
+                {'branch_name': 'feature/test'},
+            )
+        assert len(tools) == 18
+        assert not result.is_error
+        assert result.content[0].text == 'feature-test-59e07aa6356b'
+
+    asyncio.run(verify())

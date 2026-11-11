@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: checks
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # actions/setup-python v7.1.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+
+      - name: Install package and CI tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --group dev -e '.[mcp]'
+
+      - name: Validate catalog manifests
+        run: mcp-catalog validate catalog.yaml
+
+      - name: Check formatting
+        run: ruff format --check .
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Type check
+        run: mypy src/mcp_catalog
+
+      - name: Run tests
+        run: pytest
+
+      - name: Check generated schemas
+        run: mcp-catalog schema check schemas
+
+      - name: Check conventional PR title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import sys
+
+          title = os.environ['PR_TITLE']
+          pattern = r'^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-zA-Z0-9._/-]+\))?!?: .+$'
+          if not re.fullmatch(pattern, title):
+              print(f'PR title is not Conventional Commits compliant: {title!r}', file=sys.stderr)
+              sys.exit(1)
+          PY
+
+  docker-mcp-cli:
+    name: Docker MCP CLI compatibility
+    runs-on: ubuntu-latest
+    steps:
+      # actions/setup-go v7.0.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.26.10'
+
+      - name: Install pinned Docker MCP CLI/Gateway
+        run: |
+          go install github.com/docker/mcp-gateway/cmd/docker-mcp@v0.44.3
+          mkdir -p "$HOME/.docker/cli-plugins"
+          install "$(go env GOPATH)/bin/docker-mcp" "$HOME/.docker/cli-plugins/docker-mcp"
+          docker mcp --help

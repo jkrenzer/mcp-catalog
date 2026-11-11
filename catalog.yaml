@@ -1,0 +1,5 @@
+schema_version: 1
+name: jkrenzer-mcp-catalog
+title: Personal MCP Catalog of JKrenzer
+description: Curated MCP servers maintained by jkrenzer.
+servers_dir: servers

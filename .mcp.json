@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "mcp-catalog": {
+      "command": "mcp-catalog",
+      "args": [
+        "mcp",
+        "serve"
+      ]
+    }
+  }
+}

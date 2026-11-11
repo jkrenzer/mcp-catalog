@@ -1,0 +1,14 @@
+schema_version: 1
+name: build-example
+kind: build
+title: Build example
+description: Example of a build-from-source MCP server.
+enabled: true
+source:
+  repository: https://github.com/example/mcp-server.git
+  revision: 0123456789abcdef0123456789abcdef01234567
+  context: .
+  dockerfile: Dockerfile
+build:
+  platforms: [linux/amd64]
+  args: {}

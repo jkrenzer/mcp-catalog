@@ -206,4 +206,4 @@ jobs:
             --branch "$BRANCH_NAME" \
             --catalog-commit "$CATALOG_COMMIT" \
             --output expected-catalog.json
-          scripts/verify-catalog-pull.sh "$reference" expected-catalog.json
+          bash scripts/verify-catalog-pull.sh "$reference" expected-catalog.json

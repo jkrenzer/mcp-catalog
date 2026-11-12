@@ -21,7 +21,8 @@
         "python.defaultInterpreterPath": "/opt/venv/bin/python"
       },
       "extensions": [
-        "ms-python.python"
+        "ms-python.python",
+        "vivaxy.vscode-conventional-commits"
       ]
     }
   }

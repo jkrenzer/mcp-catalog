@@ -10,6 +10,7 @@ from ..logging_config import (
 )
 from .branching import app as branching_app
 from .builds import app as builds_app
+from .clone import app as clone_app
 from .docker import app as docker_app
 from .docker import catalog_app
 from .mcp import app as mcp_app
@@ -44,6 +45,7 @@ def configure_cli_logging(
 
 
 app.add_typer(validation_app)
+app.add_typer(clone_app)
 app.add_typer(schema_app, name='schema')
 app.add_typer(server_app, name='server')
 app.add_typer(upstream_app, name='upstream')

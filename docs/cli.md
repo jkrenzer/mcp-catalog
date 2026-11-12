@@ -28,6 +28,20 @@ mcp-catalog schema check schemas
 
 Catalog validation reads the configured `servers_dir` in sorted filename order when the catalog does not embed a `servers` list. A server file's base name must match its manifest `name`; validating a standalone server checks its content only. Schema checking compares parsed JSON values, so formatting-only changes do not constitute drift.
 
+## Clone a repository
+
+`clone` uses the installed Git executable. It accepts pip-style Git URLs with an optional
+revision and project subdirectory, and forwards options after `--` to `git clone`:
+
+```bash
+mcp-catalog clone git+https://github.com/example/project.git@v1.2.0#egg=project
+mcp-catalog clone 'git+https://github.com/example/project.git@main#subdirectory=packages/server'
+mcp-catalog clone https://github.com/example/project.git -- --depth 1 --branch main
+```
+
+Git prints its normal clone/check-out messages. The command reports the cloned directory or the
+selected repository subdirectory; it does not change the calling shell's working directory.
+
 ## Manage servers
 
 Use `--manifest` with a complete, validated server YAML file when adding or replacing a server:

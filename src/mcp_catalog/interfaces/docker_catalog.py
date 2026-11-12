@@ -16,13 +16,15 @@ from .catalog import find_server, load_catalog
 from .docker_entry import (
     OCI_LABEL_PREFIX,
     docker_server_entry,
-    label_arguments,
     normalize_description,
 )
 
 __all__ = [
-    'catalog_labels',
+    'CATALOG_ARTIFACT_TYPE',
+    'catalog_annotations',
     'docker_catalog',
+    'docker_catalog_artifact',
+    'docker_catalog_artifact_document',
     'docker_catalog_document',
     'docker_server_document',
     'docker_server_entry',
@@ -32,8 +34,12 @@ __all__ = [
     'publish_catalog_from_manifest',
     'publish_image_from_catalog',
     'require_executable',
+    'verify_catalog_artifact',
     'write_json',
 ]
+
+CATALOG_ARTIFACT_TYPE = 'application/vnd.docker.mcp.catalog.v1+json'
+CATALOG_LAYER_MEDIA_TYPE = 'application/json'
 
 logger = get_logger(__name__)
 
@@ -82,6 +88,37 @@ def docker_catalog(
     }
 
 
+def docker_catalog_artifact(
+    catalog: CatalogModel,
+    *,
+    images: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Return the payload of the ``docker mcp catalog pull`` OCI artifact.
+
+    Each enabled server becomes an ``image`` or ``remote`` entry whose ``snapshot.server`` holds
+    the same Docker MCP server entry used by the legacy ``registry`` document, so the gateway
+    does not need to resolve image labels on pull.
+    """
+    image_map = images or {}
+    repository = None if catalog.repository is None else str(catalog.repository)
+    servers: list[dict[str, Any]] = []
+    for server in sorted(catalog.servers, key=lambda item: item.name):
+        if not server.enabled:
+            continue
+        entry = docker_server_entry(server, image=image_map.get(server.name), repository=repository)
+        item: dict[str, Any]
+        if server.kind == 'remote':
+            item = {'type': 'remote', 'endpoint': entry['remote']['url']}
+        else:
+            image = entry.get('image')
+            if not image:
+                raise ValueError(f'Server has no image reference: {server.name}')
+            item = {'type': 'image', 'image': image}
+        item['snapshot'] = {'server': entry}
+        servers.append(item)
+    return {'title': catalog.title, 'servers': servers}
+
+
 def write_json(path: str | Path, document: dict[str, Any]) -> Path:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,6 +146,23 @@ def docker_catalog_document(
     return docker_catalog(catalog, images=images)
 
 
+def docker_catalog_artifact_document(
+    catalog_path: str | Path,
+    *,
+    branch: str = 'main',
+    catalog_commit: str | None = None,
+) -> dict[str, Any]:
+    catalog = load_catalog(catalog_path)
+    commit = _catalog_commit(catalog, catalog_commit)
+    images = {
+        server.name: image
+        for server in catalog.servers
+        if server.enabled
+        if (image := image_for_server(server, commit=commit, branch=branch)) is not None
+    }
+    return docker_catalog_artifact(catalog, images=images)
+
+
 def docker_server_document(
     catalog_path: str | Path,
     name: str,
@@ -128,51 +182,43 @@ def docker_server_document(
     return {name: entry}
 
 
-def catalog_labels(catalog: CatalogModel, *, catalog_commit: str | None = None) -> dict[str, str]:
-    """Return the OCI labels applied to the published catalog image."""
-    labels = {
+def catalog_annotations(
+    catalog: CatalogModel, *, catalog_commit: str | None = None
+) -> dict[str, str]:
+    """Return the OCI manifest annotations applied to the published catalog artifact."""
+    annotations = {
         f'{OCI_LABEL_PREFIX}title': catalog.title,
         f'{OCI_LABEL_PREFIX}description': normalize_description(catalog.description),
     }
     if catalog.repository is not None:
-        labels[f'{OCI_LABEL_PREFIX}source'] = str(catalog.repository)
+        annotations[f'{OCI_LABEL_PREFIX}source'] = str(catalog.repository)
     if catalog_commit:
-        labels[f'{OCI_LABEL_PREFIX}revision'] = catalog_commit
-    return dict(sorted(labels.items()))
+        annotations[f'{OCI_LABEL_PREFIX}revision'] = catalog_commit
+    return dict(sorted(annotations.items()))
 
 
 def publish_catalog(
     catalog_document: dict[str, Any],
     reference: str,
     *,
-    cache_from: str | None = None,
-    cache_to: str | None = None,
-    labels: dict[str, str] | None = None,
+    annotations: dict[str, str] | None = None,
 ) -> None:
-    """Publish a generated Docker MCP catalog as a small OCI image."""
+    """Push a catalog payload with oras as a ``docker mcp catalog pull`` compatible artifact.
+
+    The artifact is an OCI image manifest with ``artifactType`` set to the Docker MCP catalog
+    type, an empty config and a single ``application/json`` layer holding the payload.
+    """
     logger.info('Publishing Docker MCP catalog %s', reference)
     with tempfile.TemporaryDirectory(prefix='mcp-catalog-publish-') as temporary:
         context = Path(temporary)
         write_json(context / 'catalog.json', catalog_document)
-        (context / 'Dockerfile').write_text(
-            'FROM scratch\nCOPY catalog.json /catalog.json\n',
-            encoding='utf-8',
-        )
-        command = [
-            'docker',
-            'buildx',
-            'build',
-            '--push',
-            '--tag',
-            reference,
-        ]
-        if cache_from:
-            command.extend(['--cache-from', cache_from])
-        if cache_to:
-            command.extend(['--cache-to', cache_to])
-        command.extend(label_arguments(labels))
-        command.append(str(context))
-        _run(command)
+        command = ['oras', 'push', '--artifact-type', CATALOG_ARTIFACT_TYPE]
+        for name, value in sorted((annotations or {}).items()):
+            command.extend(['--annotation', f'{name}={value}'])
+        command.extend([reference, f'catalog.json:{CATALOG_LAYER_MEDIA_TYPE}'])
+        # oras records layer titles from the path as given, so run from the payload directory.
+        _run(command, cwd=context)
+    verify_catalog_artifact(reference)
 
 
 def publish_catalog_from_manifest(
@@ -180,13 +226,11 @@ def publish_catalog_from_manifest(
     *,
     branch: str = 'main',
     catalog_commit: str | None = None,
-    cache_from: str | None = None,
-    cache_to: str | None = None,
 ) -> str:
-    require_executable('docker')
+    require_executable('oras')
     catalog = load_catalog(catalog_path)
     commit = _catalog_commit(catalog, catalog_commit)
-    document = docker_catalog_document(
+    document = docker_catalog_artifact_document(
         catalog_path,
         branch=branch,
         catalog_commit=commit,
@@ -195,9 +239,7 @@ def publish_catalog_from_manifest(
     publish_catalog(
         document,
         reference,
-        cache_from=cache_from,
-        cache_to=cache_to,
-        labels=catalog_labels(catalog, catalog_commit=commit),
+        annotations=catalog_annotations(catalog, catalog_commit=commit),
     )
     return reference
 
@@ -226,9 +268,25 @@ def publish_image_from_catalog(
     return image
 
 
-def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
+def _run(command: list[str], *, cwd: str | Path | None = None) -> subprocess.CompletedProcess[str]:
     logger.debug('Running external tool %s', command[0])
-    return subprocess.run(command, check=True, text=True)
+    return subprocess.run(command, check=True, text=True, cwd=cwd)
+
+
+def verify_catalog_artifact(reference: str) -> None:
+    """Fail unless the reference resolves to a Docker MCP catalog artifact."""
+    require_executable('oras')
+    result = subprocess.run(
+        ['oras', 'manifest', 'fetch', reference],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    artifact_type = json.loads(result.stdout).get('artifactType')
+    if artifact_type != CATALOG_ARTIFACT_TYPE:
+        raise ValueError(
+            f'{reference} has artifact type {artifact_type!r}, expected {CATALOG_ARTIFACT_TYPE!r}.'
+        )
 
 
 def inspect_publication(reference: str) -> None:

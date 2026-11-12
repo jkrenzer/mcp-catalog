@@ -6,9 +6,11 @@ from pathlib import Path
 import typer
 
 from ..interfaces.docker_catalog import (
+    docker_catalog_artifact_document,
     docker_catalog_document,
     docker_server_document,
     publish_catalog_from_manifest,
+    require_executable,
     write_json,
 )
 from ..logging_config import get_logger
@@ -53,9 +55,16 @@ def docker_catalog_command(
     output: Path = typer.Option(Path('dist/docker-mcp-catalog.json'), '--output', '-o'),
     branch: str = typer.Option('main', '--branch'),
     catalog_commit: str | None = typer.Option(None, '--catalog-commit'),
+    artifact: bool = typer.Option(
+        False,
+        '--artifact',
+        help='Emit the OCI artifact payload used by `docker mcp catalog pull`, not the legacy '
+        'registry document accepted by `docker mcp catalog import`.',
+    ),
 ) -> None:
+    generate = docker_catalog_artifact_document if artifact else docker_catalog_document
     document = action(
-        lambda: docker_catalog_document(
+        lambda: generate(
             catalog_path,
             branch=branch,
             catalog_commit=catalog_commit,
@@ -64,21 +73,21 @@ def docker_catalog_command(
     logger.info('Wrote Docker MCP catalog to %s', write_json(output, document))
 
 
-@catalog_app.command('publish', help='Publish the generated Docker MCP catalog as an OCI image.')
+@catalog_app.command(
+    'publish',
+    help='Publish the Docker MCP catalog as an OCI artifact for `docker mcp catalog pull`.',
+)
 def catalog_publish(
     catalog_path: Path = typer.Argument(Path('catalog.yaml'), help='Catalog manifest.'),
     branch: str = typer.Option('main', '--branch'),
     catalog_commit: str | None = typer.Option(None, '--catalog-commit'),
-    cache_from: str | None = typer.Option(None, '--cache-from', help='Buildx cache source.'),
-    cache_to: str | None = typer.Option(None, '--cache-to', help='Buildx cache destination.'),
 ) -> None:
+    action(lambda: require_executable('oras'))
     reference = action(
         lambda: publish_catalog_from_manifest(
             catalog_path,
             branch=branch,
             catalog_commit=catalog_commit,
-            cache_from=cache_from,
-            cache_to=cache_to,
         )
     )
     logger.info('Published %s', reference)

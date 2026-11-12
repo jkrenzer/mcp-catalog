@@ -129,11 +129,19 @@ mcp-catalog docker server-entry example catalog.yaml --branch main --catalog-com
 mcp-catalog docker catalog catalog.yaml --output dist/docker-mcp-catalog.json
 mcp-catalog catalog publish catalog.yaml --branch main
 mcp-catalog publication inspect ghcr.io/jkrenzer/mcp-catalog/catalog:latest
+mcp-catalog docker catalog catalog.yaml --artifact --output dist/catalog-artifact.json
 ```
 
-`docker server-entry` accepts `--image` to override a generated image reference. `catalog publish` publishes the generated JSON as `/catalog.json` in an OCI image whose reference follows the branch-aware catalog naming rules; the image is labelled with the catalog title, description, repository and commit. Docker and appropriate registry permissions are required for publication and inspection.
+`docker server-entry` accepts `--image` to override a generated image reference. `docker catalog` writes the legacy `registry` document accepted by `docker mcp catalog import`; with `--artifact` it writes the payload of the OCI catalog artifact described below.
 
-The `docker mcp` CLI imports catalogs from local files or HTTP(S) URLs, not from OCI images. To use a published catalog, extract `/catalog.json` from the image (for example with `docker create` and `docker cp`) and run `docker mcp catalog import ./catalog.json`.
+`catalog publish` pushes the catalog to the branch-aware catalog reference as an OCI artifact that `docker mcp catalog pull` consumes. It requires [oras](https://oras.land) on `PATH` and registry authentication (`oras login`). The artifact is an OCI image manifest with `artifactType` `application/vnd.docker.mcp.catalog.v1+json`, an empty config and one `application/json` layer holding `{title, servers}`. Every enabled server is an `image` or `remote` entry whose `snapshot.server` carries the full Docker MCP server entry. The manifest is annotated with the catalog title, description, repository and commit, and the pushed reference is verified to carry the catalog artifact type. Use it with Docker Desktop 4.62 or later:
+
+```bash
+docker mcp catalog pull ghcr.io/jkrenzer/mcp-catalog/catalog:latest
+docker mcp gateway run --catalog ghcr.io/jkrenzer/mcp-catalog/catalog:latest
+```
+
+The package must be public for anonymous pulls. The earlier `FROM scratch` image containing `/catalog.json` is no longer published; reuse of the `catalog:latest` tag replaces it.
 
 ## MCP server
 

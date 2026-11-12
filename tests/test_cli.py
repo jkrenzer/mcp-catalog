@@ -12,9 +12,12 @@ from mcp_catalog import get_logger
 from mcp_catalog.cli import app, main
 from mcp_catalog.interfaces.builds import _run, build_image_for_server
 from mcp_catalog.interfaces.docker_catalog import (
-    catalog_labels,
+    CATALOG_ARTIFACT_TYPE,
+    catalog_annotations,
+    docker_catalog_artifact,
     publish_catalog,
     publish_catalog_from_manifest,
+    verify_catalog_artifact,
 )
 from mcp_catalog.interfaces.docker_entry import image_labels, image_metadata
 from mcp_catalog.io.yaml import dump_yaml_file
@@ -337,24 +340,84 @@ def test_docker_build_does_not_inherit_git_credentials(monkeypatch):
     assert 'GIT_CONFIG_VALUE_0' not in observed['env']
 
 
-def test_catalog_publish_accepts_buildx_cache_options(monkeypatch):
+def test_catalog_publish_pushes_oras_artifact(monkeypatch):
     commands = []
+    verified = []
     monkeypatch.setattr(
         'mcp_catalog.interfaces.docker_catalog._run',
-        lambda command: commands.append(command),
+        lambda command, cwd=None: commands.append((command, cwd)),
+    )
+    monkeypatch.setattr(
+        'mcp_catalog.interfaces.docker_catalog.verify_catalog_artifact', verified.append
     )
 
     publish_catalog(
-        {'version': 2, 'registry': {}},
+        {'title': 'Example', 'servers': []},
         'ghcr.io/example/catalog:latest',
-        cache_from='type=gha,scope=catalog',
-        cache_to='type=gha,scope=catalog,mode=max',
+        annotations={'org.opencontainers.image.title': 'Example'},
     )
 
-    command = commands[0]
-    assert '--push' in command
-    assert command[command.index('--cache-from') + 1] == 'type=gha,scope=catalog'
-    assert command[command.index('--cache-to') + 1] == 'type=gha,scope=catalog,mode=max'
+    command, cwd = commands[0]
+    assert command == [
+        'oras',
+        'push',
+        '--artifact-type',
+        CATALOG_ARTIFACT_TYPE,
+        '--annotation',
+        'org.opencontainers.image.title=Example',
+        'ghcr.io/example/catalog:latest',
+        'catalog.json:application/json',
+    ]
+    assert cwd is not None
+    assert verified == ['ghcr.io/example/catalog:latest']
+
+
+def test_verify_catalog_artifact_checks_artifact_type(monkeypatch):
+    monkeypatch.setattr('mcp_catalog.interfaces.docker_catalog.require_executable', lambda _: None)
+
+    def fetch(artifact_type):
+        class Result:
+            stdout = json.dumps({'artifactType': artifact_type})
+
+        return lambda *args, **kwargs: Result()
+
+    monkeypatch.setattr(
+        'mcp_catalog.interfaces.docker_catalog.subprocess.run', fetch(CATALOG_ARTIFACT_TYPE)
+    )
+    verify_catalog_artifact('ghcr.io/example/catalog:latest')
+
+    monkeypatch.setattr('mcp_catalog.interfaces.docker_catalog.subprocess.run', fetch(None))
+    with pytest.raises(ValueError, match='artifact type'):
+        verify_catalog_artifact('ghcr.io/example/catalog:latest')
+
+
+def test_docker_catalog_artifact_wraps_entries_in_snapshots(tmp_path):
+    catalog_path = tmp_path / 'catalog.yaml'
+    remote = {
+        'schema_version': 1,
+        'schema_kind': 'https://mcp-catalog.schema.krenzer.space/server.schema.json',
+        'name': 'remote-example',
+        'kind': 'remote',
+        'title': 'Remote example',
+        'description': 'Remote server',
+        'remote': {'url': 'https://example.com/mcp'},
+    }
+    _write_catalog(
+        catalog_path, [_build_server('enabled'), _build_server('disabled', enabled=False), remote]
+    )
+
+    document = docker_catalog_artifact(
+        load_catalog(catalog_path), images={'enabled': 'example/enabled:latest'}
+    )
+
+    assert set(document) == {'title', 'servers'}
+    image_server, remote_server = document['servers']
+    assert image_server['type'] == 'image'
+    assert image_server['image'] == 'example/enabled:latest'
+    assert image_server['snapshot']['server']['name'] == 'enabled'
+    assert remote_server['type'] == 'remote'
+    assert remote_server['endpoint'] == 'https://example.com/mcp'
+    assert remote_server['snapshot']['server']['type'] == 'remote'
 
 
 def test_docker_catalog_excludes_disabled_servers(tmp_path):
@@ -548,27 +611,28 @@ def test_build_plan_includes_image_labels(tmp_path):
     )
 
 
-def test_catalog_publish_applies_catalog_labels(tmp_path, monkeypatch):
+def test_catalog_publish_applies_catalog_annotations(tmp_path, monkeypatch):
     catalog_path = tmp_path / 'catalog.yaml'
     _write_catalog(catalog_path, [], repository='https://github.com/example/catalog')
     commands = []
     monkeypatch.setattr(
         'mcp_catalog.interfaces.docker_catalog._run',
-        lambda command: commands.append(command),
+        lambda command, cwd=None: commands.append(command),
     )
     monkeypatch.setattr('mcp_catalog.interfaces.docker_catalog.require_executable', lambda _: None)
+    monkeypatch.setattr('mcp_catalog.interfaces.docker_catalog.verify_catalog_artifact', print)
 
     publish_catalog_from_manifest(catalog_path, branch='main', catalog_commit='deadbeef')
 
     command = commands[0]
-    labels = [command[index + 1] for index, item in enumerate(command) if item == '--label']
-    assert labels == [
+    annotations = [command[i + 1] for i, item in enumerate(command) if item == '--annotation']
+    assert annotations == [
         'org.opencontainers.image.description=Catalog used by CLI tests.',
         'org.opencontainers.image.revision=deadbeef',
         'org.opencontainers.image.source=https://github.com/example/catalog',
         'org.opencontainers.image.title=Test Catalog',
     ]
-    assert catalog_labels(load_catalog(catalog_path)) == {
+    assert catalog_annotations(load_catalog(catalog_path)) == {
         'org.opencontainers.image.description': 'Catalog used by CLI tests.',
         'org.opencontainers.image.source': 'https://github.com/example/catalog',
         'org.opencontainers.image.title': 'Test Catalog',

@@ -50,7 +50,7 @@ def catalog_publish(
     branch: str = 'main',
     catalog_commit: str | None = None,
 ) -> str:
-    """Publish a generated Docker MCP catalog as an OCI image."""
+    """Publish the Docker MCP catalog as an OCI artifact for `docker mcp catalog pull`."""
     reference = publish_catalog_from_manifest(
         catalog_path,
         branch=branch,

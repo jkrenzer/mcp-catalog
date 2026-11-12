@@ -16,6 +16,9 @@ class CatalogModel(BaseModel):
     model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
 
     schema_version: Literal[1] = Field(description='Manifest schema version; must be 1.')
+    schema_kind: Literal['https://mcp-catalog.schema.krenzer.space/catalog.schema.json'] = Field(
+        description='URL identifying the catalog manifest schema.'
+    )
     name: str = Field(
         pattern=r'^[a-z0-9]+(?:-[a-z0-9]+)*$',
         description='Catalog identifier (Docker catalog name).',

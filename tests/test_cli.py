@@ -34,6 +34,7 @@ runner = CliRunner()
 def _build_server(name: str, *, enabled: bool = True) -> dict[str, object]:
     return {
         'schema_version': 1,
+        'schema_kind': 'https://mcp-catalog.schema.krenzer.space/server.schema.json',
         'name': name,
         'kind': 'build',
         'title': name.title(),
@@ -57,6 +58,7 @@ def _write_catalog(path, servers: list[dict[str, object]], **fields: object) -> 
         path,
         {
             'schema_version': 1,
+            'schema_kind': 'https://mcp-catalog.schema.krenzer.space/catalog.schema.json',
             'name': 'test-catalog',
             'title': 'Test Catalog',
             'description': 'Catalog used by CLI tests.',
@@ -178,6 +180,7 @@ def test_server_crud_updates_catalog_server_files(tmp_path):
         catalog,
         {
             'schema_version': 1,
+            'schema_kind': 'https://mcp-catalog.schema.krenzer.space/catalog.schema.json',
             'name': 'test-catalog',
             'title': 'Test Catalog',
             'description': 'Catalog used by CLI tests.',
@@ -207,6 +210,7 @@ def test_upstream_resolve_is_read_only_and_update_is_explicit(tmp_path, monkeypa
         catalog,
         {
             'schema_version': 1,
+            'schema_kind': 'https://mcp-catalog.schema.krenzer.space/catalog.schema.json',
             'name': 'test-catalog',
             'title': 'Test Catalog',
             'description': 'Catalog used by CLI tests.',
@@ -575,6 +579,7 @@ def test_docker_catalog_uses_docker_remote_entry_shape(tmp_path):
     catalog_path = tmp_path / 'catalog.yaml'
     remote = {
         'schema_version': 1,
+        'schema_kind': 'https://mcp-catalog.schema.krenzer.space/server.schema.json',
         'name': 'remote-example',
         'kind': 'remote',
         'title': 'Remote example',
@@ -599,6 +604,7 @@ def test_docker_catalog_remote_entry_includes_transport_headers_and_oauth(tmp_pa
     catalog_path = tmp_path / 'catalog.yaml'
     remote = {
         'schema_version': 1,
+        'schema_kind': 'https://mcp-catalog.schema.krenzer.space/server.schema.json',
         'name': 'remote-example',
         'kind': 'remote',
         'title': 'Remote example',
@@ -783,6 +789,7 @@ def test_tools_file_resolves_relative_to_manifest_and_feeds_entries(tmp_path, mo
         catalog_path,
         {
             'schema_version': 1,
+            'schema_kind': 'https://mcp-catalog.schema.krenzer.space/catalog.schema.json',
             'name': 'test-catalog',
             'title': 'Test Catalog',
             'description': 'Catalog used by CLI tests.',

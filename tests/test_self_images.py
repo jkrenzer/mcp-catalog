@@ -100,6 +100,7 @@ def test_self_plan_command_reads_catalog_repository(tmp_path):
         catalog_path,
         {
             'schema_version': 1,
+            'schema_kind': 'https://mcp-catalog.schema.krenzer.space/catalog.schema.json',
             'name': 'test-catalog',
             'title': 'Test Catalog',
             'description': 'Catalog used by CLI tests.',

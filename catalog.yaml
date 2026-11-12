@@ -1,4 +1,5 @@
 schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/catalog.schema.json
 name: jkrenzer-mcp-catalog
 title: Personal MCP Catalog of JKrenzer
 description: Curated MCP servers maintained by jkrenzer.

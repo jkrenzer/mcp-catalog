@@ -2,12 +2,15 @@
 
 ## Schema version
 
-The catalog and server manifests use `schema_version: 1`.
+The catalog and server manifests use `schema_version: 1` and a `schema_kind` URI that
+identifies their schema file: `https://mcp-catalog.schema.krenzer.space/catalog.schema.json`
+for catalogs and `https://mcp-catalog.schema.krenzer.space/server.schema.json` for servers.
 
 ## Catalog layout
 
 ```yaml
 schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/catalog.schema.json
 name: personal-mcp-catalog
 title: Personal MCP Catalog
 description: Curated MCP servers maintained by jkrenzer.
@@ -31,6 +34,7 @@ the Pydantic models with `mcp-catalog schema generate schemas`.
 
 ```yaml
 schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json
 name: local-server
 kind: build
 title: Local Server
@@ -54,6 +58,7 @@ and `dockerfile` is a file relative to that context:
 
 ```yaml
 schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json
 name: local-server
 kind: build
 title: Local Server
@@ -79,6 +84,7 @@ before their repository-relative path checks.
 
 ```yaml
 schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json
 name: prebuilt-server
 kind: image
 title: Prebuilt server
@@ -91,6 +97,7 @@ image: ghcr.io/example/server@sha256:0123456789abcdef0123456789abcdef0123456789a
 
 ```yaml
 schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json
 name: remote-server
 kind: remote
 title: Remote server
@@ -148,6 +155,7 @@ Example:
 
 ```yaml
 schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json
 name: example
 kind: image
 title: Example

@@ -1,4 +1,5 @@
 schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json
 name: image-example
 kind: image
 title: Image example

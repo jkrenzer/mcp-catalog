@@ -15,6 +15,7 @@ from mcp_catalog.models import (
 def test_build_manifest_works():
     build = {
         'schema_version': 1,
+        'schema_kind': 'https://mcp-catalog.schema.krenzer.space/server.schema.json',
         'name': 'demo-build',
         'kind': 'build',
         'title': 'Demo build',
@@ -39,6 +40,7 @@ def test_catalog_model_accepts_empty_servers():
     catalog = CatalogModel.model_validate(
         {
             'schema_version': 1,
+            'schema_kind': 'https://mcp-catalog.schema.krenzer.space/catalog.schema.json',
             'name': 'personal-mcp-catalog',
             'title': 'Personal MCP Catalog',
             'description': 'Example catalog',
@@ -56,6 +58,7 @@ def test_local_build_paths_resolve_relative_to_manifest(tmp_path, monkeypatch):
     dockerfile.write_text('FROM scratch\n', encoding='utf-8')
     manifest_dir.joinpath('local.yaml').write_text(
         'schema_version: 1\n'
+        'schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json\n'
         'name: local-build\n'
         'kind: build\n'
         'title: Local build\n'
@@ -86,6 +89,7 @@ def test_local_build_paths_expand_git_base_cwd_and_shell_env(tmp_path, monkeypat
     manifest = tmp_path / 'server.yaml'
     manifest.write_text(
         'schema_version: 1\n'
+        'schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json\n'
         'name: local-build\n'
         'kind: build\n'
         'title: Local build\n'
@@ -109,6 +113,7 @@ def test_local_build_paths_require_existing_directory_and_file(tmp_path):
     manifest = tmp_path / 'server.yaml'
     manifest.write_text(
         'schema_version: 1\n'
+        'schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json\n'
         'name: local-build\n'
         'kind: build\n'
         'title: Local build\n'
@@ -136,6 +141,7 @@ def test_local_dockerfile_must_be_inside_context(tmp_path):
     manifest = tmp_path / 'server.yaml'
     manifest.write_text(
         'schema_version: 1\n'
+        'schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json\n'
         'name: local-build\n'
         'kind: build\n'
         'title: Local build\n'
@@ -162,6 +168,7 @@ def test_repository_and_remote_urls_expand_environment_variables(monkeypatch):
     build = BuildServer.model_validate(
         {
             'schema_version': 1,
+            'schema_kind': 'https://mcp-catalog.schema.krenzer.space/server.schema.json',
             'name': 'demo-build',
             'kind': 'build',
             'title': 'Demo build',
@@ -176,6 +183,7 @@ def test_repository_and_remote_urls_expand_environment_variables(monkeypatch):
     remote = RemoteServer.model_validate(
         {
             'schema_version': 1,
+            'schema_kind': 'https://mcp-catalog.schema.krenzer.space/server.schema.json',
             'name': 'remote-demo',
             'kind': 'remote',
             'title': 'Remote demo',
@@ -192,6 +200,7 @@ def test_repository_and_remote_urls_expand_environment_variables(monkeypatch):
 def _container_fields() -> dict:
     return {
         'schema_version': 1,
+        'schema_kind': 'https://mcp-catalog.schema.krenzer.space/server.schema.json',
         'name': 'demo',
         'kind': 'image',
         'title': 'Demo',
@@ -270,6 +279,7 @@ def test_config_required_properties_must_exist():
 def test_remote_servers_reject_container_runtime_and_accept_transport():
     remote = {
         'schema_version': 1,
+        'schema_kind': 'https://mcp-catalog.schema.krenzer.space/server.schema.json',
         'name': 'remote-demo',
         'kind': 'remote',
         'title': 'Remote demo',
@@ -298,6 +308,7 @@ def test_catalog_repository_expands_environment(monkeypatch):
     catalog = CatalogModel.model_validate(
         {
             'schema_version': 1,
+            'schema_kind': 'https://mcp-catalog.schema.krenzer.space/catalog.schema.json',
             'name': 'demo-catalog',
             'title': 'Demo',
             'description': 'Demo catalog',

@@ -11,6 +11,10 @@ ENV VIRTUAL_ENV=${VIRTUAL_ENV} \
 RUN mkdir -p ${WORKSPACE_DIR}
 WORKDIR ${WORKSPACE_DIR}
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN python -m venv "${VIRTUAL_ENV}" && \
     pip install --upgrade pip
 
@@ -21,7 +25,6 @@ FROM base AS development
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir --group dev --editable .
@@ -32,17 +35,23 @@ RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash", "-l"]
 
-FROM base AS mcp
 
-RUN pip install --no-cache-dir ".[mcp]"
+FROM base AS interactive
+
 RUN mkdir /data
 WORKDIR /data
 VOLUME /data
 
+
+FROM interactive AS mcp
+
+RUN pip install --no-cache-dir ".[mcp]"
+
 ENTRYPOINT ["mcp-catalog"]
 CMD ["mcp", "serve"]
 
-FROM base AS command
+
+FROM interactive AS command
 
 RUN pip install --no-cache-dir .
 

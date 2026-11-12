@@ -40,7 +40,7 @@ WORKDIR /data
 VOLUME /data
 
 ENTRYPOINT ["mcp-catalog"]
-CMD ["serve"]
+CMD ["mcp", "serve"]
 
 FROM base AS command
 

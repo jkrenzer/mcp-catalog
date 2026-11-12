@@ -66,14 +66,20 @@ jobs:
     name: Docker MCP CLI compatibility
     runs-on: ubuntu-latest
     steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: docker/mcp-gateway
+          ref: v0.44.3
+          path: mcp-gateway
+
       # actions/setup-go v7.0.0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version: '1.26.10'
 
-      - name: Install pinned Docker MCP CLI/Gateway
+      - name: Build pinned Docker MCP CLI/Gateway
         run: |
-          go install github.com/docker/mcp-gateway/cmd/docker-mcp@v0.44.3
-          mkdir -p "$HOME/.docker/cli-plugins"
-          install "$(go env GOPATH)/bin/docker-mcp" "$HOME/.docker/cli-plugins/docker-mcp"
+          mkdir -p "$HOME/.docker/cli-plugins" mcp-gateway/dist
+          make -C mcp-gateway docker-mcp
           docker mcp --help

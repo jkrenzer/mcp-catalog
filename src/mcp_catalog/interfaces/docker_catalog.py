@@ -9,10 +9,31 @@ from typing import Any
 
 from ..branching import build_image_reference, build_server_tag, catalog_reference
 from ..logging_config import get_logger
-from ..models import BuildServer, CatalogModel, GitSourceModel, ServerModel
+from ..models import BuildServer, CatalogModel, ServerModel
 from .builds import current_commit
 from .builds import publish_image as _publish_image
 from .catalog import find_server, load_catalog
+from .docker_entry import (
+    OCI_LABEL_PREFIX,
+    docker_server_entry,
+    label_arguments,
+    normalize_description,
+)
+
+__all__ = [
+    'catalog_labels',
+    'docker_catalog',
+    'docker_catalog_document',
+    'docker_server_document',
+    'docker_server_entry',
+    'image_for_server',
+    'inspect_publication',
+    'publish_catalog',
+    'publish_catalog_from_manifest',
+    'publish_image_from_catalog',
+    'require_executable',
+    'write_json',
+]
 
 logger = get_logger(__name__)
 
@@ -39,47 +60,20 @@ def _catalog_commit(catalog: CatalogModel, provided: str | None) -> str:
     return current_commit() if has_build_images else ''
 
 
-def docker_server_entry(server: ServerModel, *, image: str | None = None) -> dict[str, Any]:
-    entry: dict[str, Any] = {
-        'name': server.name,
-        'description': server.description,
-        'title': server.title,
-        'type': 'remote' if server.kind == 'remote' else 'server',
-        'ref': '',
-        'source': '',
-        'icon': '',
-        'tools': [],
-        'prompts': 0,
-        'resources': {},
-    }
-    if server.kind == 'remote':
-        entry['source'] = str(server.remote.url)
-        entry['remote'] = {
-            'transport_type': 'streamable-http',
-            'url': str(server.remote.url),
-        }
-    else:
-        entry['image'] = image or getattr(server, 'image', None)
-        if not entry['image']:
-            raise ValueError(f'An image reference is required for build server {server.name!r}.')
-        if isinstance(server, BuildServer):
-            if isinstance(server.source, GitSourceModel):
-                entry['source'] = str(server.source.repository)
-                entry['ref'] = server.source.revision
-    return entry
-
-
 def docker_catalog(
     catalog: CatalogModel,
     *,
     images: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     image_map = images or {}
+    repository = None if catalog.repository is None else str(catalog.repository)
     registry = {}
     for server in sorted(catalog.servers, key=lambda item: item.name):
         if not server.enabled:
             continue
-        registry[server.name] = docker_server_entry(server, image=image_map.get(server.name))
+        registry[server.name] = docker_server_entry(
+            server, image=image_map.get(server.name), repository=repository
+        )
     return {
         'version': 2,
         'name': catalog.name,
@@ -129,8 +123,22 @@ def docker_server_document(
     entry = docker_server_entry(
         server,
         image=image or image_for_server(server, commit=commit, branch=branch),
+        repository=None if catalog.repository is None else str(catalog.repository),
     )
     return {name: entry}
+
+
+def catalog_labels(catalog: CatalogModel, *, catalog_commit: str | None = None) -> dict[str, str]:
+    """Return the OCI labels applied to the published catalog image."""
+    labels = {
+        f'{OCI_LABEL_PREFIX}title': catalog.title,
+        f'{OCI_LABEL_PREFIX}description': normalize_description(catalog.description),
+    }
+    if catalog.repository is not None:
+        labels[f'{OCI_LABEL_PREFIX}source'] = str(catalog.repository)
+    if catalog_commit:
+        labels[f'{OCI_LABEL_PREFIX}revision'] = catalog_commit
+    return dict(sorted(labels.items()))
 
 
 def publish_catalog(
@@ -139,6 +147,7 @@ def publish_catalog(
     *,
     cache_from: str | None = None,
     cache_to: str | None = None,
+    labels: dict[str, str] | None = None,
 ) -> None:
     """Publish a generated Docker MCP catalog as a small OCI image."""
     logger.info('Publishing Docker MCP catalog %s', reference)
@@ -161,6 +170,7 @@ def publish_catalog(
             command.extend(['--cache-from', cache_from])
         if cache_to:
             command.extend(['--cache-to', cache_to])
+        command.extend(label_arguments(labels))
         command.append(str(context))
         _run(command)
 
@@ -174,10 +184,12 @@ def publish_catalog_from_manifest(
     cache_to: str | None = None,
 ) -> str:
     require_executable('docker')
+    catalog = load_catalog(catalog_path)
+    commit = _catalog_commit(catalog, catalog_commit)
     document = docker_catalog_document(
         catalog_path,
         branch=branch,
-        catalog_commit=catalog_commit,
+        catalog_commit=commit,
     )
     reference = catalog_reference(branch)
     publish_catalog(
@@ -185,6 +197,7 @@ def publish_catalog_from_manifest(
         reference,
         cache_from=cache_from,
         cache_to=cache_to,
+        labels=catalog_labels(catalog, catalog_commit=commit),
     )
     return reference
 

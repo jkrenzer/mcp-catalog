@@ -4,5 +4,13 @@ kind: remote
 title: Remote example
 description: Example of an MCP-over-HTTP endpoint.
 enabled: true
+icon: https://www.google.com/s2/favicons?domain=example.com&sz=64
+readme: https://example.com/docs/mcp
 remote:
   url: https://example.com/mcp
+  transport_type: streamable-http
+oauth:
+  providers:
+    - provider: example
+      secret: remote-example.personal_access_token
+      env: EXAMPLE_PERSONAL_ACCESS_TOKEN

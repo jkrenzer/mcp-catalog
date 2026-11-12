@@ -739,37 +739,14 @@ rapidfuzz = ">=3.0.0,<4.0.0"
 name = "click"
 version = "8.5.1"
 description = "Composable command line interface toolkit"
-optional = false
+optional = true
 python-versions = ">=3.10"
-groups = ["main", "agents"]
+groups = ["main"]
+markers = "extra == \"mcp\""
 files = [
     {file = "click-8.5.1-py3-none-any.whl", hash = "sha256:8bb5376d2006950386f8c6427613334a2acadc5f559cb80e638d00b4df957e37"},
     {file = "click-8.5.1.tar.gz", hash = "sha256:9bbfada76703fd1d784b83eea012e3e8c6a001a876543ef104fa56aaaeb072b4"},
 ]
-markers = {main = "extra == \"mcp\""}
-
-[[package]]
-name = "click-to-mcp"
-version = "0.5.0"
-description = "Auto-wrap any Click/typer CLI as an MCP (Model Context Protocol) server â€” with auto-discovery, stdio, HTTP+SSE, and Streamable HTTP transport"
-optional = false
-python-versions = ">=3.10"
-groups = ["agents"]
-files = []
-develop = false
-
-[package.dependencies]
-click = ">=8.0"
-
-[package.extras]
-dev = ["httpx (>=0.24)", "pytest (>=7.0)", "ruff (>=0.9.0,<1.0)"]
-http = ["sse-starlette (>=1.0)", "starlette (>=0.27)", "uvicorn (>=0.20)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/Coding-Dev-Tools/click-to-mcp.git"
-reference = "HEAD"
-resolved_reference = "25cb33d833c028bec5c62a0505267d2b0386b293"
 
 [[package]]
 name = "colorama"
@@ -3568,7 +3545,7 @@ version = "0.13.7"
 description = "An extremely fast Python package and project manager, written in Rust."
 optional = false
 python-versions = ">=3.8"
-groups = ["agents"]
+groups = ["agents", "dev"]
 files = [
     {file = "uv-0.13.7-py3-none-linux_armv6l.whl", hash = "sha256:89df450624dec8c48b8b5a7adb654928cc50e95753f869c70cd65ef8333f2197"},
     {file = "uv-0.13.7-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:fd04bf01ba5f2829f4f94ca8f0c24a743f21e73d75045613ed6fc2fd66fc7bda"},
@@ -4082,4 +4059,4 @@ mcp = ["fastmcp"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "1c2116b2e64c6b16a64e3fbaf338045a3cdf053f0b38b54d6c64eee64a95d916"
+content-hash = "40f65f2510a93bdf98c299d867a4fef4eb112d2dd7a662e2fb8ac24a1debce45"

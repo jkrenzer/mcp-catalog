@@ -10,8 +10,13 @@ from typer.testing import CliRunner
 import mcp_catalog.cli as cli
 from mcp_catalog import get_logger
 from mcp_catalog.cli import app, main
-from mcp_catalog.interfaces.builds import _run
-from mcp_catalog.interfaces.docker_catalog import publish_catalog
+from mcp_catalog.interfaces.builds import _run, build_image_for_server
+from mcp_catalog.interfaces.docker_catalog import (
+    catalog_labels,
+    publish_catalog,
+    publish_catalog_from_manifest,
+)
+from mcp_catalog.interfaces.docker_entry import image_labels, image_metadata
 from mcp_catalog.io.yaml import dump_yaml_file
 from mcp_catalog.models import BuildServer, GitSourceModel
 from mcp_catalog.workflows import (
@@ -47,7 +52,7 @@ def _build_server(name: str, *, enabled: bool = True) -> dict[str, object]:
     }
 
 
-def _write_catalog(path, servers: list[dict[str, object]]) -> None:
+def _write_catalog(path, servers: list[dict[str, object]], **fields: object) -> None:
     dump_yaml_file(
         path,
         {
@@ -55,9 +60,59 @@ def _write_catalog(path, servers: list[dict[str, object]]) -> None:
             'name': 'test-catalog',
             'title': 'Test Catalog',
             'description': 'Catalog used by CLI tests.',
+            **fields,
             'servers': servers,
         },
     )
+
+
+def _described_server(name: str) -> dict[str, object]:
+    return {
+        **_build_server(name),
+        'icon': 'https://example.com/icon.png',
+        'readme': 'https://example.com/docs',
+        'date_added': '2026-01-15T12:30:00+02:00',
+        'metadata': {'category': 'devops', 'tags': ['demo'], 'license': 'MIT', 'owner': 'me'},
+        'runtime': {
+            'command': ['--transport=stdio'],
+            'volumes': [f'{{{{{name}.data_dir}}}}:/data'],
+            'user': '1000:1000',
+            'long_lived': True,
+            'disable_network': True,
+            'allow_hosts': ['api.example.com:443'],
+            'extra_hosts': ['host.docker.internal:host-gateway'],
+            'env': [{'name': 'DEMO_REGION', 'value': f'{{{{{name}.region}}}}'}],
+        },
+        'secrets': [
+            {
+                'name': f'{name}.api_key',
+                'env': 'DEMO_API_KEY',
+                'example': '<token>',
+                'description': 'API key',
+                'required': True,
+            }
+        ],
+        'config': [
+            {
+                'description': 'Demo settings',
+                'properties': {
+                    'data_dir': {'type': 'string'},
+                    'region': {'type': 'string', 'default': 'eu'},
+                },
+                'required': ['data_dir'],
+                'any_of': [{'required': ['region']}],
+            }
+        ],
+        'tools': [
+            {
+                'name': 'search',
+                'description': 'Search things.',
+                'arguments': [{'name': 'query', 'desc': 'Terms', 'optional': True}],
+                'annotations': {'read_only_hint': True},
+            }
+        ],
+        'prefix': 'demo_',
+    }
 
 
 def test_validate_accepts_catalog_with_embedded_servers(tmp_path):
@@ -314,6 +369,208 @@ def test_docker_catalog_excludes_disabled_servers(tmp_path):
     assert document['registry']['enabled']['ref'] == '0123456789abcdef0123456789abcdef01234567'
 
 
+def test_docker_catalog_entry_includes_docker_spec_fields(tmp_path):
+    catalog_path = tmp_path / 'catalog.yaml'
+    _write_catalog(catalog_path, [_described_server('demo')])
+
+    entry = docker_catalog(load_catalog(catalog_path), images={'demo': 'example/demo:latest'})[
+        'registry'
+    ]['demo']
+
+    assert entry['icon'] == 'https://example.com/icon.png'
+    assert entry['readme'] == 'https://example.com/docs'
+    assert entry['dateAdded'] == '2026-01-15T10:30:00Z'
+    assert entry['upstream'] == 'https://github.com/example/server.git'
+    assert entry['source'] == 'https://github.com/example/server.git'
+    assert entry['metadata'] == {
+        'category': 'devops',
+        'tags': ['demo'],
+        'license': 'MIT',
+        'owner': 'me',
+    }
+    assert entry['command'] == ['--transport=stdio']
+    assert entry['volumes'] == ['{{demo.data_dir}}:/data']
+    assert entry['user'] == '1000:1000'
+    assert entry['longLived'] is True
+    assert entry['disableNetwork'] is True
+    assert entry['allowHosts'] == ['api.example.com:443']
+    assert entry['extraHosts'] == ['host.docker.internal:host-gateway']
+    assert entry['env'] == [{'name': 'DEMO_REGION', 'value': '{{demo.region}}'}]
+    assert entry['secrets'] == [
+        {
+            'name': 'demo.api_key',
+            'env': 'DEMO_API_KEY',
+            'example': '<token>',
+            'description': 'API key',
+            'required': True,
+        }
+    ]
+    assert entry['config'] == [
+        {
+            'name': 'demo',
+            'description': 'Demo settings',
+            'type': 'object',
+            'properties': {
+                'data_dir': {'type': 'string'},
+                'region': {'type': 'string', 'default': 'eu'},
+            },
+            'required': ['data_dir'],
+            'anyOf': [{'required': ['region']}],
+        }
+    ]
+    assert entry['tools'] == [
+        {
+            'name': 'search',
+            'description': 'Search things.',
+            'arguments': [{'name': 'query', 'type': 'string', 'desc': 'Terms', 'optional': True}],
+            'annotations': {'readOnlyHint': True},
+        }
+    ]
+    assert entry['prefix'] == 'demo_'
+    assert entry['prompts'] == 0
+    assert entry['resources'] == {}
+
+
+def test_docker_catalog_omits_unset_optional_fields_and_normalizes_description(tmp_path):
+    catalog_path = tmp_path / 'catalog.yaml'
+    server = _build_server('plain')
+    server['description'] = 'Folded\n  description text\n'
+    _write_catalog(catalog_path, [server])
+
+    entry = docker_catalog(load_catalog(catalog_path), images={'plain': 'example/plain:1'})[
+        'registry'
+    ]['plain']
+
+    assert entry['description'] == 'Folded description text'
+    assert set(entry) == {
+        'name',
+        'title',
+        'description',
+        'type',
+        'icon',
+        'tools',
+        'prompts',
+        'resources',
+        'ref',
+        'source',
+        'image',
+        'upstream',
+    }
+
+
+def test_local_build_entry_links_to_catalog_repository(tmp_path):
+    context = tmp_path / 'local-context'
+    context.mkdir()
+    (context / 'Dockerfile').write_text('FROM scratch\n', encoding='utf-8')
+    catalog_path = tmp_path / 'catalog.yaml'
+    server = _build_server('local')
+    server['source'] = {'context': 'local-context', 'dockerfile': 'Dockerfile'}
+    _write_catalog(catalog_path, [server], repository='https://github.com/example/catalog')
+    catalog = load_catalog(catalog_path)
+
+    entry = docker_catalog(catalog, images={'local': 'example/local:1'})['registry']['local']
+    labels = image_labels(
+        catalog.servers[0],
+        repository='https://github.com/example/catalog',
+        catalog_commit='deadbeef',
+    )
+
+    assert entry['source'] == 'https://github.com/example/catalog'
+    assert entry['ref'] == ''
+    assert 'upstream' not in entry
+    assert labels['org.opencontainers.image.source'] == 'https://github.com/example/catalog'
+    assert labels['org.opencontainers.image.revision'] == 'deadbeef'
+
+
+def test_image_labels_and_self_describing_metadata(tmp_path):
+    catalog_path = tmp_path / 'catalog.yaml'
+    _write_catalog(catalog_path, [_described_server('demo')])
+    server = load_catalog(catalog_path).servers[0]
+    assert isinstance(server, BuildServer)
+
+    labels = image_labels(server, catalog_commit='deadbeef')
+    metadata = json.loads(labels['io.docker.server.metadata'])
+
+    assert list(labels) == sorted(labels)
+    assert labels['org.opencontainers.image.title'] == 'Demo'
+    assert labels['org.opencontainers.image.description'] == 'demo server'
+    assert labels['org.opencontainers.image.source'] == 'https://github.com/example/server.git'
+    assert labels['org.opencontainers.image.revision'] == '0123456789abcdef0123456789abcdef01234567'
+    assert labels['org.opencontainers.image.url'] == 'https://github.com/example/server.git'
+    assert labels['org.opencontainers.image.documentation'] == 'https://example.com/docs'
+    assert labels['org.opencontainers.image.licenses'] == 'MIT'
+    assert labels['org.opencontainers.image.vendor'] == 'me'
+    assert metadata == image_metadata(server)
+    assert metadata['type'] == 'server'
+    assert metadata['env'] == [{'name': 'DEMO_REGION'}]
+    assert metadata['tools'][0]['name'] == 'search'
+    assert metadata['config'][0]['name'] == 'demo'
+    assert metadata['metadata']['category'] == 'devops'
+    assert not {'image', 'secrets', 'volumes', 'command', 'allowHosts'} & set(metadata)
+
+
+def test_image_build_applies_generated_labels(tmp_path, monkeypatch):
+    context = tmp_path / 'local-context'
+    context.mkdir()
+    (context / 'Dockerfile').write_text('FROM scratch\n', encoding='utf-8')
+    catalog_path = tmp_path / 'catalog.yaml'
+    server = _described_server('demo')
+    server['source'] = {'context': 'local-context', 'dockerfile': 'Dockerfile'}
+    _write_catalog(catalog_path, [server], repository='https://github.com/example/catalog')
+    commands = []
+    monkeypatch.setattr(
+        'mcp_catalog.interfaces.builds._run',
+        lambda command, **kwargs: commands.append(command),
+    )
+
+    build_image_for_server(load_catalog(catalog_path), name='demo', catalog_commit='deadbeef')
+
+    command = commands[0]
+    labels = [command[index + 1] for index, item in enumerate(command) if item == '--label']
+    assert 'org.opencontainers.image.source=https://github.com/example/catalog' in labels
+    assert 'org.opencontainers.image.revision=deadbeef' in labels
+    assert any(label.startswith('io.docker.server.metadata={') for label in labels)
+    assert labels == sorted(labels)
+
+
+def test_build_plan_includes_image_labels(tmp_path):
+    catalog_path = tmp_path / 'catalog.yaml'
+    _write_catalog(catalog_path, [_build_server('example')])
+
+    plan = build_plan(load_catalog(catalog_path), catalog_commit='deadbeef', branch='main')
+
+    assert plan['builds'][0]['labels']['org.opencontainers.image.revision'] == (
+        '0123456789abcdef0123456789abcdef01234567'
+    )
+
+
+def test_catalog_publish_applies_catalog_labels(tmp_path, monkeypatch):
+    catalog_path = tmp_path / 'catalog.yaml'
+    _write_catalog(catalog_path, [], repository='https://github.com/example/catalog')
+    commands = []
+    monkeypatch.setattr(
+        'mcp_catalog.interfaces.docker_catalog._run',
+        lambda command: commands.append(command),
+    )
+    monkeypatch.setattr('mcp_catalog.interfaces.docker_catalog.require_executable', lambda _: None)
+
+    publish_catalog_from_manifest(catalog_path, branch='main', catalog_commit='deadbeef')
+
+    command = commands[0]
+    labels = [command[index + 1] for index, item in enumerate(command) if item == '--label']
+    assert labels == [
+        'org.opencontainers.image.description=Catalog used by CLI tests.',
+        'org.opencontainers.image.revision=deadbeef',
+        'org.opencontainers.image.source=https://github.com/example/catalog',
+        'org.opencontainers.image.title=Test Catalog',
+    ]
+    assert catalog_labels(load_catalog(catalog_path)) == {
+        'org.opencontainers.image.description': 'Catalog used by CLI tests.',
+        'org.opencontainers.image.source': 'https://github.com/example/catalog',
+        'org.opencontainers.image.title': 'Test Catalog',
+    }
+
+
 def test_docker_catalog_uses_docker_remote_entry_shape(tmp_path):
     catalog_path = tmp_path / 'catalog.yaml'
     remote = {
@@ -334,6 +591,49 @@ def test_docker_catalog_uses_docker_remote_entry_shape(tmp_path):
     assert entry['remote'] == {
         'transport_type': 'streamable-http',
         'url': 'https://example.com/mcp',
+    }
+    assert 'image' not in entry
+
+
+def test_docker_catalog_remote_entry_includes_transport_headers_and_oauth(tmp_path):
+    catalog_path = tmp_path / 'catalog.yaml'
+    remote = {
+        'schema_version': 1,
+        'name': 'remote-example',
+        'kind': 'remote',
+        'title': 'Remote example',
+        'description': 'Remote server',
+        'remote': {
+            'url': 'https://example.com/sse',
+            'transport_type': 'sse',
+            'headers': {'X-Team': '{{remote-example.team}}'},
+        },
+        'config': [{'description': 'Team', 'properties': {'team': {'type': 'string'}}}],
+        'oauth': {
+            'providers': [
+                {
+                    'provider': 'example',
+                    'secret': 'remote-example.token',
+                    'env': 'EXAMPLE_TOKEN',
+                }
+            ],
+            'scopes': ['read'],
+        },
+    }
+    _write_catalog(catalog_path, [remote])
+
+    entry = docker_catalog(load_catalog(catalog_path))['registry']['remote-example']
+
+    assert entry['remote'] == {
+        'transport_type': 'sse',
+        'url': 'https://example.com/sse',
+        'headers': {'X-Team': '{{remote-example.team}}'},
+    }
+    assert entry['oauth'] == {
+        'providers': [
+            {'provider': 'example', 'secret': 'remote-example.token', 'env': 'EXAMPLE_TOKEN'}
+        ],
+        'scopes': ['read'],
     }
 
 
@@ -432,6 +732,8 @@ def test_fastmcp_mirrors_public_cli_commands():
         'catalog_publish',
         'publication_inspect',
         'branch_slug',
+        'self_plan',
+        'self_build',
     }
 
 
@@ -466,8 +768,91 @@ def test_fastmcp_stdio_client_lists_and_calls_tools():
                 'branch_slug',
                 {'branch_name': 'feature/test'},
             )
-        assert len(tools) == 18
+        assert len(tools) == 20
         assert not result.is_error
         assert result.content[0].text == 'feature-test-59e07aa6356b'
 
     asyncio.run(verify())
+
+
+def test_tools_file_resolves_relative_to_manifest_and_feeds_entries(tmp_path, monkeypatch):
+    catalog_path = tmp_path / 'catalog.yaml'
+    servers_dir = tmp_path / 'servers'
+    servers_dir.mkdir()
+    dump_yaml_file(
+        catalog_path,
+        {
+            'schema_version': 1,
+            'name': 'test-catalog',
+            'title': 'Test Catalog',
+            'description': 'Catalog used by CLI tests.',
+            'servers_dir': 'servers',
+        },
+    )
+    (servers_dir / 'example.tools.json').write_text(
+        json.dumps(
+            [
+                {
+                    'name': 'search',
+                    'description': 'Search things.',
+                    'arguments': [{'name': 'query', 'type': 'string', 'desc': 'Terms'}],
+                }
+            ]
+        ),
+        encoding='utf-8',
+    )
+    dump_yaml_file(
+        servers_dir / 'example.yaml',
+        {**_build_server('example'), 'tools_file': 'example.tools.json'},
+    )
+    monkeypatch.chdir(tmp_path.parent)
+
+    catalog = load_catalog(catalog_path)
+    server = catalog.servers[0]
+    entry = docker_catalog(catalog, images={'example': 'example/image:1'})['registry']['example']
+    metadata = image_metadata(server)
+
+    assert server.tools_file == servers_dir / 'example.tools.json'
+    assert entry['tools'] == [
+        {
+            'name': 'search',
+            'description': 'Search things.',
+            'arguments': [{'name': 'query', 'type': 'string', 'desc': 'Terms'}],
+        }
+    ]
+    assert metadata['tools'] == entry['tools']
+
+
+def test_tools_file_and_inline_tools_are_mutually_exclusive(tmp_path):
+    tools_file = tmp_path / 'tools.json'
+    tools_file.write_text('[]', encoding='utf-8')
+    catalog_path = tmp_path / 'catalog.yaml'
+    _write_catalog(
+        catalog_path,
+        [{**_build_server('example'), 'tools': [{'name': 'a'}], 'tools_file': 'tools.json'}],
+    )
+
+    with pytest.raises(Exception, match='either inline or in tools_file'):
+        load_catalog(catalog_path)
+
+
+def test_tools_file_must_contain_a_list(tmp_path):
+    tools_file = tmp_path / 'tools.yaml'
+    tools_file.write_text('name: not-a-list\n', encoding='utf-8')
+    catalog_path = tmp_path / 'catalog.yaml'
+    _write_catalog(catalog_path, [{**_build_server('example'), 'tools_file': 'tools.yaml'}])
+
+    with pytest.raises(ValueError, match='must contain a list of tools'):
+        docker_catalog(load_catalog(catalog_path), images={'example': 'example/image:1'})
+
+
+def test_repository_tools_file_matches_running_server_shape():
+    tools = json.loads(
+        (Path(__file__).parents[1] / 'servers/agentralabs-agentic-memory-mcp/tools.json').read_text(
+            encoding='utf-8'
+        )
+    )
+
+    assert len(tools) == 124
+    assert [tool['name'] for tool in tools][:2] == ['conversation_log', 'memory_add']
+    assert all(tool['description'] for tool in tools)

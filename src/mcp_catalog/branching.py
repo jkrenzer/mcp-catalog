@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 DEFAULT_REGISTRY = 'ghcr.io/jkrenzer/mcp-catalog'
+SELF_NAMESPACE = 'self'
 
 
 def _coerce_branch_name(branch_name: Any) -> str:
@@ -45,6 +46,20 @@ def catalog_reference(branch_name: Any, *, registry: str = DEFAULT_REGISTRY) -> 
     if slug == 'main':
         return f'{registry}/catalog:latest'
     return f'{registry}/{slug}/catalog:latest'
+
+
+def self_image_reference(
+    component: str, branch_name: Any, tag: str, *, registry: str = DEFAULT_REGISTRY
+) -> str:
+    """Return the GHCR reference for an image of the mcp-catalog tooling itself.
+
+    Tooling images live under the ``self`` namespace: ``<registry>/self/<component>`` on
+    ``main`` and ``<registry>/self/<branch slug>/<component>`` on other branches.
+    """
+    slug = branch_namespace(branch_name)
+    if slug == 'main':
+        return f'{registry}/{SELF_NAMESPACE}/{component}:{tag}'
+    return f'{registry}/{SELF_NAMESPACE}/{slug}/{component}:{tag}'
 
 
 def build_server_tag(

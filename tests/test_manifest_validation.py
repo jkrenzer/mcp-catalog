@@ -1,3 +1,4 @@
+import pytest
 from pydantic import ValidationError
 
 from mcp_catalog.interfaces.catalog import load_server_manifest
@@ -5,6 +6,7 @@ from mcp_catalog.models import (
     BuildServer,
     CatalogModel,
     GitSourceModel,
+    ImageServer,
     LocalSourceModel,
     RemoteServer,
 )
@@ -185,3 +187,122 @@ def test_repository_and_remote_urls_expand_environment_variables(monkeypatch):
     assert isinstance(build.source, GitSourceModel)
     assert str(build.source.repository) == 'https://github.com/example/demo.git'
     assert str(remote.remote.url) == 'https://example.com/mcp'
+
+
+def _container_fields() -> dict:
+    return {
+        'schema_version': 1,
+        'name': 'demo',
+        'kind': 'image',
+        'title': 'Demo',
+        'description': 'Demo server',
+        'image': 'ghcr.io/example/demo@sha256:' + '0' * 64,
+    }
+
+
+def test_catalog_fields_accept_docker_catalog_metadata(monkeypatch):
+    monkeypatch.setenv('DEMO_ICON', 'https://example.com/icon.png')
+    server = ImageServer.model_validate(
+        {
+            **_container_fields(),
+            'icon': '$DEMO_ICON',
+            'readme': 'https://example.com/docs',
+            'upstream': 'https://github.com/example/demo',
+            'date_added': '2026-01-15T00:00:00Z',
+            'metadata': {'category': 'devops', 'tags': ['demo'], 'license': 'MIT'},
+            'runtime': {
+                'volumes': ['{{demo.data_dir}}:/data'],
+                'disable_network': True,
+                'env': [{'name': 'DEMO_REGION', 'value': '{{demo.region}}'}],
+            },
+            'secrets': [{'name': 'demo.api_key', 'env': 'DEMO_API_KEY'}],
+            'config': [
+                {
+                    'description': 'Demo settings',
+                    'properties': {'data_dir': {'type': 'string'}, 'region': {'type': 'string'}},
+                    'required': ['data_dir'],
+                }
+            ],
+            'tools': [{'name': 'search', 'annotations': {'read_only_hint': True}}],
+        }
+    )
+
+    assert str(server.icon) == 'https://example.com/icon.png'
+    assert server.config[0].name == 'demo'
+    assert server.runtime.disable_network is True
+    assert server.tools[0].annotations is not None
+    assert server.tools[0].annotations.read_only_hint is True
+
+
+def test_secret_names_must_use_prefix_dot_name():
+    with pytest.raises(ValidationError, match='secrets.0.name'):
+        ImageServer.model_validate(
+            {**_container_fields(), 'secrets': [{'name': 'api_key', 'env': 'DEMO_API_KEY'}]}
+        )
+
+
+def test_templates_must_reference_the_server_configuration():
+    with pytest.raises(ValidationError, match="must reference 'demo'"):
+        ImageServer.model_validate(
+            {
+                **_container_fields(),
+                'runtime': {'env': [{'name': 'DEMO_REGION', 'value': '{{other.region}}'}]},
+            }
+        )
+
+
+def test_config_required_properties_must_exist():
+    with pytest.raises(ValidationError, match='not defined'):
+        ImageServer.model_validate(
+            {
+                **_container_fields(),
+                'config': [
+                    {
+                        'description': 'Demo settings',
+                        'properties': {'region': {'type': 'string'}},
+                        'required': ['missing'],
+                    }
+                ],
+            }
+        )
+
+
+def test_remote_servers_reject_container_runtime_and_accept_transport():
+    remote = {
+        'schema_version': 1,
+        'name': 'remote-demo',
+        'kind': 'remote',
+        'title': 'Remote demo',
+        'description': 'Remote endpoint',
+        'remote': {
+            'url': 'https://example.com/sse',
+            'transport_type': 'sse',
+            'headers': {'X-Team': '{{remote-demo.team}}'},
+        },
+        'config': [{'description': 'Team', 'properties': {'team': {'type': 'string'}}}],
+    }
+
+    server = RemoteServer.model_validate(remote)
+    assert server.remote.transport_type == 'sse'
+
+    with pytest.raises(ValidationError, match='runtime'):
+        RemoteServer.model_validate({**remote, 'runtime': {'volumes': ['/a:/b']}})
+    with pytest.raises(ValidationError, match='transport_type'):
+        RemoteServer.model_validate(
+            {**remote, 'remote': {'url': 'https://x', 'transport_type': 'stdio'}}
+        )
+
+
+def test_catalog_repository_expands_environment(monkeypatch):
+    monkeypatch.setenv('CATALOG_REPOSITORY', 'https://github.com/example/catalog')
+    catalog = CatalogModel.model_validate(
+        {
+            'schema_version': 1,
+            'name': 'demo-catalog',
+            'title': 'Demo',
+            'description': 'Demo catalog',
+            'repository': '$CATALOG_REPOSITORY',
+        }
+    )
+
+    assert str(catalog.repository) == 'https://github.com/example/catalog'

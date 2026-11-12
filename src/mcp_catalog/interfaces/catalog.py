@@ -43,6 +43,14 @@ def load_server_manifest(path: str | Path) -> ServerModel:
     return validate_server_document(load_yaml_file(path), base_dir=Path(path).parent)
 
 
+def _resolve_manifest_path(value: str, base_dir: str | Path) -> str:
+    """Expand variables and resolve a manifest-relative path to an absolute one."""
+    path = Path(expand_environment(value, variables=_path_variables())).expanduser()
+    if not path.is_absolute():
+        path = Path(base_dir) / path
+    return str(path.resolve())
+
+
 def validate_server_document(
     document: Any,
     *,
@@ -50,6 +58,9 @@ def validate_server_document(
 ) -> ServerModel:
     if not isinstance(document, dict):
         raise ValueError('A server manifest must contain a YAML mapping.')
+    tools_file = document.get('tools_file')
+    if isinstance(tools_file, str):
+        document = {**document, 'tools_file': _resolve_manifest_path(tools_file, base_dir)}
     source = document.get('source')
     if document.get('kind') == 'build' and isinstance(source, dict) and 'repository' not in source:
         normalized_document = dict(document)

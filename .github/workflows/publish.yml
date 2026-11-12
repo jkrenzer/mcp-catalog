@@ -123,6 +123,20 @@ jobs:
               subprocess.run(command, check=True)
           PY
 
+      - name: Build and publish mcp-catalog tooling images
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          CATALOG_COMMIT: ${{ github.sha }}
+        run: |
+          for component in cli mcp; do
+            mcp-catalog self build "$component" catalog.yaml \
+              --branch "$BRANCH_NAME" \
+              --catalog-commit "$CATALOG_COMMIT" \
+              --push \
+              --cache-from "type=gha,scope=mcp-catalog-self-$component" \
+              --cache-to "type=gha,scope=mcp-catalog-self-$component,mode=max"
+          done
+
       - name: Publish Docker MCP catalog
         env:
           BRANCH_NAME: ${{ github.ref_name }}

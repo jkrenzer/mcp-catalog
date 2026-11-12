@@ -34,8 +34,9 @@ with **Actions → Publish catalog and server images → Run workflow**. It does
 `pull_request` and does not use `pull_request_target`. No workflow automatically resolves or updates
 upstream revisions; revision updates remain an explicit catalog-maintenance operation.
 
-The workflow builds server images with Docker Buildx for the platforms declared in each manifest
-and publishes the generated Docker MCP catalog. Branch `main` uses the main namespace; every other
+The workflow builds server images with Docker Buildx for the platforms declared in each manifest,
+publishes the tooling images (`self/cli` and `self/mcp`, see the
+[CLI reference](cli.md#tooling-images)) and publishes the generated Docker MCP catalog. Branch `main` uses the main namespace; every other
 branch uses its isolated, normalized branch namespace. The workflow token is used for GHCR login.
 Only the publishing job has `packages: write`; validation jobs have read-only repository access.
 Buildx cache is stored using GitHub Actions cache scopes.
@@ -45,17 +46,14 @@ hosted MCP endpoint.
 
 ### GHCR package setup
 
-The image names are derived from the repository owner and catalog naming rules. For predictable
-repository association and permissions, include the OCI source label in Dockerfiles for
-build-server images when you control their source:
-
-```dockerfile
-LABEL org.opencontainers.image.source="https://github.com/OWNER/REPOSITORY"
-```
-
-For server images whose Dockerfile cannot be changed (for example, an upstream source), and for the
-generated catalog image, connect each GHCR package to this repository from the package's
-**Package settings** after its first publication if GitHub has not associated it automatically.
+The image names are derived from the repository owner and catalog naming rules. GitHub associates
+a GHCR package with a repository through the `org.opencontainers.image.source` label. The CLI sets
+that label automatically: locally built server images and the generated catalog image use the
+catalog manifest's `repository` URL, so set `repository` in `catalog.yaml` to this repository.
+Git-sourced server images are labelled with their upstream repository instead, because that is
+where their Dockerfile and sources live; connect those GHCR packages to this repository from the
+package's **Package settings** after their first publication if GitHub has not associated them
+automatically.
 
 Set package visibility explicitly in GHCR. A public package can be pulled anonymously; private
 packages require authentication. Linking a package before publication can enable permission
@@ -80,7 +78,8 @@ missing and must be implemented before such builds can be published.
 
 ## Docker MCP CLI in CI
 
-GitHub-hosted runners do not come with the Docker MCP CLI plugin installed. CI installs Docker
-MCP CLI/Gateway `v0.44.3` using Go `1.26.10`, copies the resulting `docker-mcp` executable to
-`~/.docker/cli-plugins/docker-mcp`, and invokes it through `docker mcp`. Keep the version pin
-explicit when upgrading the compatibility check.
+GitHub-hosted runners do not come with the Docker MCP CLI plugin installed. CI checks out Docker
+MCP CLI/Gateway `v0.44.3` and builds it with Go `1.26.10` using the upstream `make docker-mcp`
+target, then invokes it through `docker mcp`. The upstream module has a `replace` directive, so
+`go install ...@v0.44.3` is not supported; building from its checkout lets Go apply the module's
+own replacements. Keep both version pins explicit when upgrading the compatibility check.

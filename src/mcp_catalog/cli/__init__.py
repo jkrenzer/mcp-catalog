@@ -15,6 +15,7 @@ from .docker import catalog_app
 from .mcp import app as mcp_app
 from .publication import app as publication_app
 from .schema import app as schema_app
+from .self_images import app as self_app
 from .servers import app as server_app
 from .upstream import app as upstream_app
 from .validate import app as validation_app
@@ -51,6 +52,7 @@ app.add_typer(docker_app, name='docker')
 app.add_typer(catalog_app, name='catalog')
 app.add_typer(publication_app, name='publication')
 app.add_typer(mcp_app, name='mcp')
+app.add_typer(self_app, name='self')
 app.add_typer(branching_app)
 
 

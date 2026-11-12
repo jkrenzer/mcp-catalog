@@ -80,11 +80,35 @@ source:
 
 The context must exist and the Dockerfile must be a file inside it. Undefined environment variables and invalid paths/URLs fail validation. Build plans identify local sources with `source.type: local`.
 
+Every build applies generated OCI labels (`org.opencontainers.image.*`) and the
+`io.docker.server.metadata` label the Docker MCP gateway reads from self-describing images; the
+labels are listed per server under `labels` in the build plan. See the
+[manifest specification](manifest-spec.md#generated-image-labels) for the exact values.
+
 `--catalog-commit` may be supplied to either command to reproduce the image tag. Git and Docker must be installed for Git sources; local sources only require Docker. Publication also requires registry authentication. Never put credentials in manifests or build args. The CLI does not currently support BuildKit secret mounts; do not provide build-time credentials to builds until this capability is implemented. See [CI and publication](ci-publication.md) for the publication workflow's upstream credential handling and GHCR setup.
+
+## Tooling images
+
+The repository Dockerfile also packages the catalog tooling itself: the `command` target is the
+CLI and the `mcp` target is the FastMCP stdio server. Both are published under the `self`
+namespace with the same branch rules as server images: `ghcr.io/jkrenzer/mcp-catalog/self/cli`
+and `.../self/mcp` on `main`, and `.../self/<branch slug>/cli` on other branches. Each build
+pushes an immutable `build-<commit>` tag and a moving `latest` tag and applies OCI labels
+(title, description, version, source and URL from the catalog `repository`, revision):
+
+```bash
+mcp-catalog self plan catalog.yaml --branch main --catalog-commit 0123456789abcdef0123456789abcdef01234567
+mcp-catalog self build cli catalog.yaml --branch main --platform linux/amd64
+mcp-catalog self build mcp catalog.yaml --branch main --push \
+  --cache-from type=gha,scope=mcp-catalog-self-mcp \
+  --cache-to type=gha,scope=mcp-catalog-self-mcp,mode=max
+```
+
+The build context defaults to the Git repository root; pass `--context` to override it.
 
 ## Docker MCP catalog artifacts
 
-The generated Docker MCP catalog uses version 2 metadata, sorts registry entries by server name, and excludes disabled servers. Build server image references are derived from the same commit and branch inputs as build plans:
+The generated Docker MCP catalog uses version 2 metadata, sorts registry entries by server name, and excludes disabled servers. Build server image references are derived from the same commit and branch inputs as build plans. Each registry entry carries every field the Docker MCP catalog format defines for which the manifest provides a value: icon, readme, upstream, dateAdded, metadata, tools, secrets, env, command, volumes, user, longLived, disableNetwork, allowHosts, extraHosts, config, oauth, prefix and, for remote servers, the transport type and headers. Descriptions are collapsed to a single line. The `ref`, `source`, `icon`, `tools`, `prompts` and `resources` keys are always present because the Docker catalog UI expects them:
 
 ```bash
 mcp-catalog docker server-entry example catalog.yaml --branch main --catalog-commit 0123456789abcdef0123456789abcdef01234567
@@ -93,7 +117,9 @@ mcp-catalog catalog publish catalog.yaml --branch main
 mcp-catalog publication inspect ghcr.io/jkrenzer/mcp-catalog/catalog:latest
 ```
 
-`docker server-entry` accepts `--image` to override a generated image reference. `catalog publish` publishes the generated JSON as `/catalog.json` in an OCI image whose reference follows the branch-aware catalog naming rules. Docker and appropriate registry permissions are required for publication and inspection.
+`docker server-entry` accepts `--image` to override a generated image reference. `catalog publish` publishes the generated JSON as `/catalog.json` in an OCI image whose reference follows the branch-aware catalog naming rules; the image is labelled with the catalog title, description, repository and commit. Docker and appropriate registry permissions are required for publication and inspection.
+
+The `docker mcp` CLI imports catalogs from local files or HTTP(S) URLs, not from OCI images. To use a published catalog, extract `/catalog.json` from the image (for example with `docker create` and `docker cp`) and run `docker mcp catalog import ./catalog.json`.
 
 ## MCP server
 

@@ -9,7 +9,17 @@ mcp = FastMCP(
 
 
 def load_tools() -> FastMCP:
-    from . import branching, builds, docker, publication, schema, servers, upstream, validate  # noqa: F401
+    from . import (  # noqa: F401
+        branching,
+        builds,
+        docker,
+        publication,
+        schema,
+        self_images,
+        servers,
+        upstream,
+        validate,
+    )
 
     return mcp
 

@@ -10,6 +10,7 @@ from ..branching import build_image_reference, build_server_tag
 from ..logging_config import get_logger
 from ..models import BuildServer, CatalogModel, GitSourceModel
 from .catalog import find_server
+from .docker_entry import image_labels, label_arguments
 
 logger = get_logger(__name__)
 
@@ -40,6 +41,7 @@ def build_plan(
     branch: str = 'main',
 ) -> dict[str, Any]:
     tag = build_server_tag(catalog_commit)
+    repository = None if catalog.repository is None else str(catalog.repository)
     builds = []
     for server in sorted(
         (item for item in catalog.servers if isinstance(item, BuildServer) and item.enabled),
@@ -65,6 +67,9 @@ def build_plan(
                 'source': source_document,
                 'platforms': list(server.build.platforms),
                 'args': dict(sorted(server.build.args.items())),
+                'labels': image_labels(
+                    server, repository=repository, catalog_commit=catalog_commit
+                ),
                 'image': build_image_reference(server.name, branch, tag),
             }
         )
@@ -88,8 +93,12 @@ def build_server_image(
     push: bool = False,
     cache_from: str | None = None,
     cache_to: str | None = None,
+    labels: dict[str, str] | None = None,
 ) -> None:
-    """Build one server image locally or publish it directly with Buildx."""
+    """Build one server image locally or publish it directly with Buildx.
+
+    ``labels`` are applied with ``--label`` and override Dockerfile LABEL values.
+    """
     platforms = [platform] if isinstance(platform, str) else platform
     if platforms is None:
         platforms = list(server.build.platforms)
@@ -126,6 +135,7 @@ def build_server_image(
                 push=push,
                 cache_from=cache_from,
                 cache_to=cache_to,
+                labels=labels,
             )
         return
 
@@ -146,6 +156,7 @@ def build_server_image(
         push=push,
         cache_from=cache_from,
         cache_to=cache_to,
+        labels=labels,
     )
 
 
@@ -159,6 +170,7 @@ def _run_docker_build(
     push: bool,
     cache_from: str | None,
     cache_to: str | None,
+    labels: dict[str, str] | None = None,
 ) -> None:
     command = [
         'docker',
@@ -178,6 +190,7 @@ def _run_docker_build(
         command.extend(['--cache-to', cache_to])
     for name, value in sorted(server.build.args.items()):
         command.extend(['--build-arg', f'{name}={value}'])
+    command.extend(label_arguments(labels))
     command.append(str(context))
     _run(command)
 
@@ -213,6 +226,11 @@ def build_image_for_server(
         push=push,
         cache_from=cache_from,
         cache_to=cache_to,
+        labels=image_labels(
+            server,
+            repository=None if catalog.repository is None else str(catalog.repository),
+            catalog_commit=commit,
+        ),
     )
     return image
 

@@ -2,8 +2,10 @@
   "$defs": {
     "BuildOptions": {
       "additionalProperties": false,
+      "description": "Docker Buildx options for a build server.",
       "properties": {
         "platforms": {
+          "description": "Target platforms passed to docker buildx build --platform.",
           "items": {
             "type": "string"
           },
@@ -14,6 +16,7 @@
           "additionalProperties": {
             "type": "string"
           },
+          "description": "Build arguments (--build-arg). Never put credentials here.",
           "title": "Args",
           "type": "object"
         }
@@ -23,44 +26,176 @@
     },
     "BuildServer": {
       "additionalProperties": false,
+      "description": "Server image built by this catalog from a Git checkout or a local context.",
       "properties": {
         "schema_version": {
           "const": 1,
+          "description": "Manifest schema version; must be 1.",
           "title": "Schema Version",
           "type": "integer"
         },
         "name": {
+          "description": "Unique lowercase server name; also the catalog registry key.",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "title": "Name",
           "type": "string"
         },
         "kind": {
           "const": "build",
+          "description": "Built from source by this catalog.",
           "title": "Kind",
           "type": "string"
         },
         "title": {
+          "description": "Human-readable display name.",
+          "minLength": 1,
           "title": "Title",
           "type": "string"
         },
         "description": {
+          "description": "Short description of the server.",
+          "minLength": 1,
           "title": "Description",
           "type": "string"
         },
         "enabled": {
           "default": true,
+          "description": "Disabled servers are excluded from output.",
           "title": "Enabled",
           "type": "boolean"
         },
-        "runtime": {
-          "additionalProperties": true,
-          "title": "Runtime",
-          "type": "object"
+        "icon": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL of a small PNG, SVG or favicon logo (max 512x512).",
+          "title": "Icon"
+        },
+        "readme": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL of the server documentation.",
+          "title": "Readme"
+        },
+        "upstream": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL of the upstream project. Defaults to the Git source repository for build servers; set it when the image wraps a project hosted elsewhere.",
+          "title": "Upstream"
+        },
+        "date_added": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the server was added to the catalog (RFC 3339). Declared, not computed.",
+          "title": "Date Added"
         },
         "metadata": {
-          "additionalProperties": true,
-          "title": "Metadata",
-          "type": "object"
+          "$ref": "#/$defs/MetadataModel",
+          "description": "Category, tags, license and owner."
+        },
+        "tools": {
+          "description": "Tools advertised in the catalog, declared inline.",
+          "items": {
+            "$ref": "#/$defs/ToolModel"
+          },
+          "title": "Tools",
+          "type": "array"
+        },
+        "tools_file": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "JSON or YAML file containing the tools list instead of declaring it inline. Relative paths resolve from the manifest directory; $GIT_BASE, $CWD and environment variables are expanded. Mutually exclusive with tools.",
+          "title": "Tools File"
+        },
+        "secrets": {
+          "description": "Secrets the gateway injects at start-up.",
+          "items": {
+            "$ref": "#/$defs/SecretModel"
+          },
+          "title": "Secrets",
+          "type": "array"
+        },
+        "config": {
+          "description": "User-configurable settings schemas.",
+          "items": {
+            "$ref": "#/$defs/ConfigModel"
+          },
+          "title": "Config",
+          "type": "array"
+        },
+        "oauth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OAuthModel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OAuth providers and scopes."
+        },
+        "prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Prefix the gateway prepends to tool names.",
+          "title": "Prefix"
+        },
+        "runtime": {
+          "$ref": "#/$defs/RuntimeOptions",
+          "description": "Container runtime settings."
         },
         "source": {
           "anyOf": [
@@ -71,10 +206,12 @@
               "$ref": "#/$defs/LocalSourceModel"
             }
           ],
+          "description": "Git or local build source.",
           "title": "Source"
         },
         "build": {
-          "$ref": "#/$defs/BuildOptions"
+          "$ref": "#/$defs/BuildOptions",
+          "description": "Buildx platforms and build arguments."
         }
       },
       "required": [
@@ -89,48 +226,274 @@
       "title": "BuildServer",
       "type": "object"
     },
+    "ConfigModel": {
+      "additionalProperties": false,
+      "description": "User-configurable settings schema (Docker catalog ``config[]`` object).\n\nProperties are JSON Schema fragments and are referenced from env values, command\narguments, volumes and headers with ``{{server-name.property}}`` templates.",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Configuration object name; defaults to the server name.",
+          "title": "Name"
+        },
+        "description": {
+          "description": "Explains what these settings configure.",
+          "title": "Description",
+          "type": "string"
+        },
+        "type": {
+          "const": "object",
+          "default": "object",
+          "description": "Always object.",
+          "title": "Type",
+          "type": "string"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "description": "Property name to JSON Schema (type, description, default, items, enum...).",
+          "title": "Properties"
+        },
+        "required": {
+          "description": "Properties the user must provide.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required",
+          "type": "array"
+        },
+        "any_of": {
+          "description": "The user must satisfy at least one requirement set.",
+          "items": {
+            "$ref": "#/$defs/RequirementSet"
+          },
+          "title": "Any Of",
+          "type": "array"
+        },
+        "one_of": {
+          "description": "The user must satisfy exactly one requirement set.",
+          "items": {
+            "$ref": "#/$defs/RequirementSet"
+          },
+          "title": "One Of",
+          "type": "array"
+        }
+      },
+      "required": [
+        "description",
+        "properties"
+      ],
+      "title": "ConfigModel",
+      "type": "object"
+    },
+    "EnvModel": {
+      "additionalProperties": false,
+      "description": "Static environment variable set in the server container.",
+      "properties": {
+        "name": {
+          "description": "Environment variable name.",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "description": "Value. May reference user configuration with {{server-name.property}} templates.",
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "title": "EnvModel",
+      "type": "object"
+    },
     "ImageServer": {
       "additionalProperties": false,
+      "description": "Server distributed as a prebuilt, digest-pinned image.",
       "properties": {
         "schema_version": {
           "const": 1,
+          "description": "Manifest schema version; must be 1.",
           "title": "Schema Version",
           "type": "integer"
         },
         "name": {
+          "description": "Unique lowercase server name; also the catalog registry key.",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "title": "Name",
           "type": "string"
         },
         "kind": {
           "const": "image",
+          "description": "Uses an existing image.",
           "title": "Kind",
           "type": "string"
         },
         "title": {
+          "description": "Human-readable display name.",
+          "minLength": 1,
           "title": "Title",
           "type": "string"
         },
         "description": {
+          "description": "Short description of the server.",
+          "minLength": 1,
           "title": "Description",
           "type": "string"
         },
         "enabled": {
           "default": true,
+          "description": "Disabled servers are excluded from output.",
           "title": "Enabled",
           "type": "boolean"
         },
-        "runtime": {
-          "additionalProperties": true,
-          "title": "Runtime",
-          "type": "object"
+        "icon": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL of a small PNG, SVG or favicon logo (max 512x512).",
+          "title": "Icon"
+        },
+        "readme": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL of the server documentation.",
+          "title": "Readme"
+        },
+        "upstream": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL of the upstream project. Defaults to the Git source repository for build servers; set it when the image wraps a project hosted elsewhere.",
+          "title": "Upstream"
+        },
+        "date_added": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the server was added to the catalog (RFC 3339). Declared, not computed.",
+          "title": "Date Added"
         },
         "metadata": {
-          "additionalProperties": true,
-          "title": "Metadata",
-          "type": "object"
+          "$ref": "#/$defs/MetadataModel",
+          "description": "Category, tags, license and owner."
+        },
+        "tools": {
+          "description": "Tools advertised in the catalog, declared inline.",
+          "items": {
+            "$ref": "#/$defs/ToolModel"
+          },
+          "title": "Tools",
+          "type": "array"
+        },
+        "tools_file": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "JSON or YAML file containing the tools list instead of declaring it inline. Relative paths resolve from the manifest directory; $GIT_BASE, $CWD and environment variables are expanded. Mutually exclusive with tools.",
+          "title": "Tools File"
+        },
+        "secrets": {
+          "description": "Secrets the gateway injects at start-up.",
+          "items": {
+            "$ref": "#/$defs/SecretModel"
+          },
+          "title": "Secrets",
+          "type": "array"
+        },
+        "config": {
+          "description": "User-configurable settings schemas.",
+          "items": {
+            "$ref": "#/$defs/ConfigModel"
+          },
+          "title": "Config",
+          "type": "array"
+        },
+        "oauth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OAuthModel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OAuth providers and scopes."
+        },
+        "prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Prefix the gateway prepends to tool names.",
+          "title": "Prefix"
+        },
+        "runtime": {
+          "$ref": "#/$defs/RuntimeOptions",
+          "description": "Container runtime settings."
         },
         "image": {
+          "description": "Digest-pinned image reference (name@sha256:...).",
           "title": "Image",
           "type": "string"
         }
@@ -148,13 +511,16 @@
     },
     "LocalSourceModel": {
       "additionalProperties": false,
+      "description": "Build context maintained next to the manifest instead of in an upstream repository.",
       "properties": {
         "context": {
+          "description": "Existing build context directory. Relative paths resolve from the manifest directory; $GIT_BASE, $CWD and environment variables are expanded.",
           "format": "directory-path",
           "title": "Context",
           "type": "string"
         },
         "dockerfile": {
+          "description": "Existing Dockerfile inside the context; relative paths resolve from it.",
           "format": "file-path",
           "title": "Dockerfile",
           "type": "string"
@@ -167,15 +533,149 @@
       "title": "LocalSourceModel",
       "type": "object"
     },
+    "MetadataModel": {
+      "additionalProperties": false,
+      "description": "Descriptive metadata used for categorisation in catalog UIs.\n\nPull and star counters are computed by Docker Hub and cannot be declared here.",
+      "properties": {
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Category such as devops, database or productivity.",
+          "title": "Category"
+        },
+        "tags": {
+          "description": "Search tags.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "SPDX identifier or license name of the server software.",
+          "title": "License"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maintainer or organisation owning the server.",
+          "title": "Owner"
+        }
+      },
+      "title": "MetadataModel",
+      "type": "object"
+    },
+    "OAuthModel": {
+      "additionalProperties": false,
+      "description": "OAuth configuration for servers that authenticate users.",
+      "properties": {
+        "providers": {
+          "description": "Supported OAuth providers.",
+          "items": {
+            "$ref": "#/$defs/OAuthProvider"
+          },
+          "minItems": 1,
+          "title": "Providers",
+          "type": "array"
+        },
+        "scopes": {
+          "description": "OAuth scopes to request.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Scopes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "providers"
+      ],
+      "title": "OAuthModel",
+      "type": "object"
+    },
+    "OAuthProvider": {
+      "additionalProperties": false,
+      "description": "OAuth provider whose token the gateway injects as an environment variable.",
+      "properties": {
+        "provider": {
+          "description": "Provider identifier such as github.",
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "secret": {
+          "description": "Secret name that stores the token, usually <server-name>.<key>.",
+          "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9._-]+$",
+          "title": "Secret",
+          "type": "string"
+        },
+        "env": {
+          "description": "Environment variable for the token.",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Env",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "secret",
+        "env"
+      ],
+      "title": "OAuthProvider",
+      "type": "object"
+    },
     "RemoteEndpoint": {
       "additionalProperties": false,
+      "description": "Hosted MCP endpoint reached over HTTP.",
       "properties": {
         "url": {
+          "description": "HTTP(S) URL of the remote MCP endpoint. Environment variables are expanded.",
           "format": "uri",
           "maxLength": 2083,
           "minLength": 1,
           "title": "Url",
           "type": "string"
+        },
+        "transport_type": {
+          "default": "streamable-http",
+          "description": "MCP transport used by the endpoint (Docker catalog remote.transport_type).",
+          "enum": [
+            "streamable-http",
+            "sse"
+          ],
+          "title": "Transport Type",
+          "type": "string"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Static HTTP headers sent with every request. Values may reference configuration with {{server-name.property}} templates.",
+          "title": "Headers",
+          "type": "object"
         }
       },
       "required": [
@@ -186,47 +686,176 @@
     },
     "RemoteServer": {
       "additionalProperties": false,
+      "description": "MCP server hosted elsewhere and reached over HTTP.",
       "properties": {
         "schema_version": {
           "const": 1,
+          "description": "Manifest schema version; must be 1.",
           "title": "Schema Version",
           "type": "integer"
         },
         "name": {
+          "description": "Unique lowercase server name; also the catalog registry key.",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "title": "Name",
           "type": "string"
         },
         "kind": {
           "const": "remote",
+          "description": "Hosted MCP endpoint.",
           "title": "Kind",
           "type": "string"
         },
         "title": {
+          "description": "Human-readable display name.",
+          "minLength": 1,
           "title": "Title",
           "type": "string"
         },
         "description": {
+          "description": "Short description of the server.",
+          "minLength": 1,
           "title": "Description",
           "type": "string"
         },
         "enabled": {
           "default": true,
+          "description": "Disabled servers are excluded from output.",
           "title": "Enabled",
           "type": "boolean"
         },
-        "runtime": {
-          "additionalProperties": true,
-          "title": "Runtime",
-          "type": "object"
+        "icon": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL of a small PNG, SVG or favicon logo (max 512x512).",
+          "title": "Icon"
+        },
+        "readme": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL of the server documentation.",
+          "title": "Readme"
+        },
+        "upstream": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "URL of the upstream project. Defaults to the Git source repository for build servers; set it when the image wraps a project hosted elsewhere.",
+          "title": "Upstream"
+        },
+        "date_added": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the server was added to the catalog (RFC 3339). Declared, not computed.",
+          "title": "Date Added"
         },
         "metadata": {
-          "additionalProperties": true,
-          "title": "Metadata",
-          "type": "object"
+          "$ref": "#/$defs/MetadataModel",
+          "description": "Category, tags, license and owner."
+        },
+        "tools": {
+          "description": "Tools advertised in the catalog, declared inline.",
+          "items": {
+            "$ref": "#/$defs/ToolModel"
+          },
+          "title": "Tools",
+          "type": "array"
+        },
+        "tools_file": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "JSON or YAML file containing the tools list instead of declaring it inline. Relative paths resolve from the manifest directory; $GIT_BASE, $CWD and environment variables are expanded. Mutually exclusive with tools.",
+          "title": "Tools File"
+        },
+        "secrets": {
+          "description": "Secrets the gateway injects at start-up.",
+          "items": {
+            "$ref": "#/$defs/SecretModel"
+          },
+          "title": "Secrets",
+          "type": "array"
+        },
+        "config": {
+          "description": "User-configurable settings schemas.",
+          "items": {
+            "$ref": "#/$defs/ConfigModel"
+          },
+          "title": "Config",
+          "type": "array"
+        },
+        "oauth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OAuthModel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OAuth providers and scopes."
+        },
+        "prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Prefix the gateway prepends to tool names.",
+          "title": "Prefix"
         },
         "remote": {
-          "$ref": "#/$defs/RemoteEndpoint"
+          "$ref": "#/$defs/RemoteEndpoint",
+          "description": "Endpoint URL, transport and headers."
         }
       },
       "required": [
@@ -240,10 +869,146 @@
       "title": "RemoteServer",
       "type": "object"
     },
+    "RequirementSet": {
+      "additionalProperties": false,
+      "description": "Alternative set of required configuration properties (anyOf / oneOf).",
+      "properties": {
+        "required": {
+          "description": "Property names that must be provided together.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required",
+          "type": "array"
+        }
+      },
+      "required": [
+        "required"
+      ],
+      "title": "RequirementSet",
+      "type": "object"
+    },
+    "RuntimeOptions": {
+      "additionalProperties": false,
+      "description": "Container runtime settings applied by the Docker MCP gateway.\n\nThese shape how the container runs and are therefore only read from the catalog,\nnever from image labels.",
+      "properties": {
+        "command": {
+          "description": "Arguments appended to the image entrypoint; may use templates.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Command",
+          "type": "array"
+        },
+        "volumes": {
+          "description": "Volume mounts as host:container[:ro|:rw]; host paths may use templates.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Volumes",
+          "type": "array"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "User the container runs as (uid:gid).",
+          "title": "User"
+        },
+        "long_lived": {
+          "default": false,
+          "description": "Keep the container running instead of starting on demand.",
+          "title": "Long Lived",
+          "type": "boolean"
+        },
+        "disable_network": {
+          "default": false,
+          "description": "Disable all network access.",
+          "title": "Disable Network",
+          "type": "boolean"
+        },
+        "allow_hosts": {
+          "description": "Allowed outbound host:port targets.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Allow Hosts",
+          "type": "array"
+        },
+        "extra_hosts": {
+          "description": "Additional /etc/hosts entries as host:ip.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Extra Hosts",
+          "type": "array"
+        },
+        "env": {
+          "description": "Static environment variables for the container.",
+          "items": {
+            "$ref": "#/$defs/EnvModel"
+          },
+          "title": "Env",
+          "type": "array"
+        }
+      },
+      "title": "RuntimeOptions",
+      "type": "object"
+    },
+    "SecretModel": {
+      "additionalProperties": false,
+      "description": "Secret injected by the Docker MCP gateway as an environment variable.\n\nThe secret value itself is never part of the catalog; users store it with\n``docker mcp secret set``.",
+      "properties": {
+        "name": {
+          "description": "Secret identifier in prefix.name form, usually <server-name>.<key>.",
+          "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9._-]+$",
+          "title": "Name",
+          "type": "string"
+        },
+        "env": {
+          "description": "Environment variable that receives the secret value.",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Env",
+          "type": "string"
+        },
+        "example": {
+          "default": "",
+          "description": "Example value shown in configuration UIs.",
+          "title": "Example",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "description": "Help text explaining how to obtain the secret.",
+          "title": "Description",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "description": "Whether the secret must be configured.",
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "env"
+      ],
+      "title": "SecretModel",
+      "type": "object"
+    },
     "SourceModel": {
       "additionalProperties": false,
+      "description": "Git repository checkout used as the Docker build context.",
       "properties": {
         "repository": {
+          "description": "HTTP(S) clone URL of the Git repository. Environment variables are expanded.",
           "format": "uri",
           "maxLength": 2083,
           "minLength": 1,
@@ -251,17 +1016,20 @@
           "type": "string"
         },
         "revision": {
+          "description": "Full 40-character commit SHA that is checked out and built.",
           "pattern": "^[a-fA-F0-9]{40}$",
           "title": "Revision",
           "type": "string"
         },
         "context": {
           "default": ".",
+          "description": "Build context directory relative to the repository root.",
           "title": "Context",
           "type": "string"
         },
         "dockerfile": {
           "default": "Dockerfile",
+          "description": "Dockerfile path relative to the build context.",
           "title": "Dockerfile",
           "type": "string"
         }
@@ -272,34 +1040,246 @@
       ],
       "title": "SourceModel",
       "type": "object"
+    },
+    "ToolAnnotations": {
+      "additionalProperties": false,
+      "description": "MCP tool annotations advertised in the catalog (behavioural hints).",
+      "properties": {
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable tool title.",
+          "title": "Title"
+        },
+        "read_only_hint": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool only reads data and does not modify state.",
+          "title": "Read Only Hint"
+        },
+        "destructive_hint": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool may perform destructive updates.",
+          "title": "Destructive Hint"
+        },
+        "idempotent_hint": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Repeated calls with the same arguments have no extra effect.",
+          "title": "Idempotent Hint"
+        },
+        "open_world_hint": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool interacts with external systems.",
+          "title": "Open World Hint"
+        }
+      },
+      "title": "ToolAnnotations",
+      "type": "object"
+    },
+    "ToolArgument": {
+      "additionalProperties": false,
+      "description": "Argument accepted by a tool (Docker catalog tools[].arguments[]).",
+      "properties": {
+        "name": {
+          "description": "Argument name.",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "default": "string",
+          "description": "JSON Schema type such as string, number, boolean, array or object.",
+          "title": "Type",
+          "type": "string"
+        },
+        "desc": {
+          "default": "",
+          "description": "Human-readable description of the argument.",
+          "title": "Desc",
+          "type": "string"
+        },
+        "optional": {
+          "default": false,
+          "description": "Whether the argument may be omitted.",
+          "title": "Optional",
+          "type": "boolean"
+        },
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolItems"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Element schema when the argument type is array."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ToolArgument",
+      "type": "object"
+    },
+    "ToolItems": {
+      "additionalProperties": false,
+      "description": "Element schema of an array-typed tool argument.",
+      "properties": {
+        "type": {
+          "description": "JSON Schema type of each array element.",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ToolItems",
+      "type": "object"
+    },
+    "ToolModel": {
+      "additionalProperties": false,
+      "description": "Tool advertised by the server for catalog discovery and documentation.\n\nDocker's registry generates this list by running the server or from a tools.json\nfile; this catalog cannot run servers during generation, so the list is declared\nin the manifest. The gateway still discovers tools at runtime.",
+      "properties": {
+        "name": {
+          "description": "Tool name, unique within the server.",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "description": "What the tool does.",
+          "title": "Description",
+          "type": "string"
+        },
+        "arguments": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ToolArgument"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Argument definitions shown in the catalog.",
+          "title": "Arguments"
+        },
+        "annotations": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolAnnotations"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Behavioural hints for the tool."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ToolModel",
+      "type": "object"
     }
   },
   "additionalProperties": false,
+  "description": "Top-level catalog manifest listing the published servers.",
   "properties": {
     "schema_version": {
       "const": 1,
+      "description": "Manifest schema version; must be 1.",
       "title": "Schema Version",
       "type": "integer"
     },
     "name": {
+      "description": "Catalog identifier (Docker catalog name).",
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "title": "Name",
       "type": "string"
     },
     "title": {
+      "description": "Display name (Docker catalog displayName).",
+      "minLength": 1,
       "title": "Title",
       "type": "string"
     },
     "description": {
+      "description": "Short description of the catalog.",
+      "minLength": 1,
       "title": "Description",
       "type": "string"
     },
+    "repository": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "HTTP(S) URL of the Git repository that maintains this catalog. Used as the OCI source label of the catalog image and of locally built server images, and as the source link of locally built servers.",
+      "title": "Repository"
+    },
     "servers_dir": {
       "default": "servers",
+      "description": "Directory with one server manifest per file, relative to the catalog.",
       "title": "Servers Dir",
       "type": "string"
     },
     "servers": {
+      "description": "Embedded server definitions; alternative to servers_dir.",
       "items": {
         "discriminator": {
           "mapping": {

@@ -6,6 +6,7 @@ A small Python package for managing declarative MCP server catalogs, validating 
 
 - Validate catalog and server manifests using Pydantic models.
 - Support build, image, and remote MCP server entry types.
+- Describe every Docker MCP catalog field (icon, metadata, tools, secrets, config, runtime settings) and label built images with OCI and `io.docker.server.metadata` labels.
 - Generate JSON Schema for manifests.
 - Compute branch-aware catalog and image references.
 - Keep YAML handling safe and deterministic.
@@ -28,6 +29,12 @@ merge requirements, and the GHCR publishing and access model.
 For the optional FastMCP server, install with `python -m pip install -e '.[mcp]'` and run `mcp-catalog mcp serve`.
 
 ## Run with Docker
+
+Published images of the tooling live under the `self` namespace:
+`ghcr.io/jkrenzer/mcp-catalog/self/cli:latest` runs the CLI and
+`ghcr.io/jkrenzer/mcp-catalog/self/mcp:latest` runs the stdio MCP server
+(`docker run --rm -i -v "${PWD}:/data" ghcr.io/jkrenzer/mcp-catalog/self/mcp:latest`).
+Branches publish under `self/<branch slug>/`.
 
 Build the CLI image from the repository root:
 

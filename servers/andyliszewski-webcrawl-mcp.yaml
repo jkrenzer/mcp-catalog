@@ -1,0 +1,96 @@
+schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json
+name: andyliszewski-webcrawl-mcp
+kind: build
+title: Webcrawl MCP
+description: >
+  Lightweight web scraping, DuckDuckGo search, site mapping and crawling.
+  Local-first extraction with trafilatura; optional Firecrawl fallback for
+  JS-heavy or bot-blocked pages.
+enabled: true
+icon: https://www.google.com/s2/favicons?domain=github.com&sz=64
+readme: https://github.com/andyliszewski/webcrawl-mcp/blob/main/README.md
+upstream: https://github.com/andyliszewski/webcrawl-mcp
+metadata:
+  category: web
+  tags: [web-scraping, crawler, search, markdown]
+  license: MIT
+  owner: andyliszewski
+source:
+  repository: https://github.com/andyliszewski/webcrawl-mcp.git
+  revision: 54cbfbb6272ba30aad98ed51dea8490687b6f269
+  context: .
+  dockerfile: Dockerfile
+build:
+  platforms: [linux/amd64]
+  args: {}
+tools:
+  - name: webcrawl_scrape
+    description: Fetch a URL and extract its main content as markdown, with provenance of the extraction path.
+    arguments:
+      - {name: url, type: string, desc: The URL to scrape}
+      - {name: timeout, type: integer, desc: 'Request timeout in seconds (default: 30)', optional: true}
+  - name: webcrawl_search
+    description: Search the web using DuckDuckGo, optionally scraping each result.
+    arguments:
+      - {name: query, type: string, desc: Search query string}
+      - {name: num_results, type: integer, desc: 'Maximum number of results (default: 5)', optional: true}
+      - {name: scrape_results, type: boolean, desc: 'Fetch full page content for each result (default: false)', optional: true}
+  - name: webcrawl_map
+    description: Discover same-domain URLs linked from a page.
+    arguments:
+      - {name: url, type: string, desc: Starting URL to map from}
+      - {name: limit, type: integer, desc: 'Maximum number of URLs to return (default: 50)', optional: true}
+  - name: webcrawl_crawl
+    description: Breadth-first crawl of multiple pages starting from a URL, with rate limiting.
+    arguments:
+      - {name: url, type: string, desc: Starting URL}
+      - {name: max_pages, type: integer, desc: 'Maximum pages to fetch (default: 10)', optional: true}
+      - {name: max_depth, type: integer, desc: 'Maximum link depth from start (default: 2)', optional: true}
+      - name: include_patterns
+        type: array
+        items: {type: string}
+        desc: 'Glob patterns for URLs to include, e.g. ["*/docs/*"]'
+        optional: true
+secrets:
+  - name: andyliszewski-webcrawl-mcp.firecrawl_api_key
+    env: FIRECRAWL_API_KEY
+    example: <FIRECRAWL_API_KEY>
+    description: >-
+      Optional. Enables the Firecrawl fallback for low-quality extractions;
+      leave unset for a fully local setup.
+    required: false
+runtime:
+  env:
+    - name: USER_AGENT
+      value: '{{andyliszewski-webcrawl-mcp.user_agent|or:Mozilla/5.0 (compatible; WebcrawlMCP/1.0; +https://github.com/andyliszewski/webcrawl-mcp)}}'
+    - name: REQUEST_TIMEOUT
+      value: '{{andyliszewski-webcrawl-mcp.request_timeout|or:30}}'
+    - name: POLITE_MODE
+      value: '{{andyliszewski-webcrawl-mcp.polite_mode|or:true}}'
+    - name: FIRECRAWL_API_URL
+      value: '{{andyliszewski-webcrawl-mcp.firecrawl_api_url|or:https://api.firecrawl.dev/v1}}'
+    - name: FALLBACK_ON_TRANSPORT_ERROR
+      value: '{{andyliszewski-webcrawl-mcp.fallback_on_transport_error|or:false}}'
+config:
+  - description: Optional tuning of the crawler; every setting has an upstream default.
+    properties:
+      user_agent:
+        type: string
+        description: HTTP User-Agent sent with requests.
+      request_timeout:
+        type: integer
+        description: Seconds before a request times out.
+        default: 30
+      polite_mode:
+        type: boolean
+        description: Retry once after the Retry-After wait on a 429 response.
+        default: true
+      firecrawl_api_url:
+        type: string
+        description: Firecrawl endpoint, used only when a Firecrawl API key secret is set.
+        default: https://api.firecrawl.dev/v1
+      fallback_on_transport_error:
+        type: boolean
+        description: Route 403/429/503 responses to Firecrawl instead of raising; needs the Firecrawl API key secret.
+        default: false

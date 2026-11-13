@@ -74,7 +74,14 @@ def test_build_self_image_composes_buildx_command(tmp_path, monkeypatch):
     assert command[command.index('--target') + 1] == 'mcp'
     tags = [command[index + 1] for index, item in enumerate(command) if item == '--tag']
     assert tags == [image, image.rsplit(':', 1)[0] + ':latest']
-    assert command[command.index('--cache-from') + 1] == 'type=gha,scope=self-mcp'
+    cache_sources = [
+        command[index + 1] for index, option in enumerate(command) if option == '--cache-from'
+    ]
+    assert cache_sources == [
+        'type=registry,ref=' + image.rsplit(':', 1)[0] + ':latest',
+        'type=gha,scope=self-mcp',
+    ]
+    assert 'BUILDKIT_INLINE_CACHE=1' in command
     assert 'org.opencontainers.image.revision=deadbeef' in command
     assert command[-1] == str(tmp_path.resolve())
 

@@ -62,6 +62,66 @@ jobs:
               sys.exit(1)
           PY
 
+  server-image-tests:
+    name: build and test MCP server images
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # actions/setup-python v7.1.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+
+      - name: Install package
+        run: python -m pip install .
+
+      # docker/setup-buildx-action v4.4.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+
+      - name: Build and test catalog server images
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          CATALOG_COMMIT: ${{ github.sha }}
+        run: |
+          mcp-catalog plan catalog.yaml \
+            --branch "$BRANCH_NAME" \
+            --catalog-commit "$CATALOG_COMMIT" \
+            --output build-plan.json
+
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          branch = os.environ['BRANCH_NAME']
+          commit = os.environ['CATALOG_COMMIT']
+          with open('build-plan.json', encoding='utf-8') as plan_file:
+              plan = json.load(plan_file)
+
+          for build in plan['builds']:
+              server = build['name']
+              cache_scope = f'mcp-catalog-ci-server-{server}'
+              platform = (
+                  'linux/amd64'
+                  if 'linux/amd64' in build['platforms']
+                  else build['platforms'][0]
+              )
+              subprocess.run([
+                  'mcp-catalog', 'image', 'build', server, 'catalog.yaml',
+                  '--branch', branch,
+                  '--catalog-commit', commit,
+                  '--platform', platform,
+                  '--cache-from', f'type=gha,scope={cache_scope}',
+                  '--cache-to', f'type=gha,scope={cache_scope},mode=max,ignore-error=true',
+              ], check=True)
+              subprocess.run([
+                  'mcp-catalog', 'test', 'server', server, 'catalog.yaml',
+                  '--image', build['image'],
+              ], check=True)
+          PY
+
   docker-mcp-cli:
     name: Docker MCP CLI compatibility
     runs-on: ubuntu-latest

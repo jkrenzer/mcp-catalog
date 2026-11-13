@@ -4,7 +4,6 @@ import json
 
 from ..interfaces.builds import current_commit
 from ..interfaces.catalog import load_catalog
-from ..interfaces.docker_catalog import require_executable
 from ..interfaces.self_images import build_self_image, self_image_plan
 from .server import mcp
 
@@ -44,7 +43,6 @@ def self_build(
     cache_to: str | None = None,
 ) -> str:
     """Build or publish one mcp-catalog tooling image (cli or mcp)."""
-    require_executable('docker')
     image = build_self_image(
         component,
         context=context,

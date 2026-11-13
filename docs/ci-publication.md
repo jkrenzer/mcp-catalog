@@ -4,7 +4,9 @@
 
 The CI workflow runs on every pull request and branch push. It validates `catalog.yaml`, checks
 Ruff formatting and lint, runs mypy and pytest, and checks generated schema drift. A separate
-compatibility job installs the pinned Docker MCP CLI/Gateway and runs `docker mcp --help`.
+server-image job builds each enabled build server and runs its MCP `initialize` and `tools/list`
+handshake. A compatibility job installs the pinned Docker MCP CLI/Gateway and runs
+`docker mcp --help`.
 
 Pull request titles must follow Conventional Commits:
 
@@ -35,11 +37,16 @@ with **Actions → Publish catalog and server images → Run workflow**. It does
 upstream revisions; revision updates remain an explicit catalog-maintenance operation.
 
 The workflow builds server images with Docker Buildx for the platforms declared in each manifest,
-publishes the tooling images (`self/cli` and `self/mcp`, see the
-[CLI reference](cli.md#tooling-images)) and publishes the Docker MCP catalog as an OCI artifact with `oras` (installed by `oras-project/setup-oras`), importable with `docker mcp catalog pull`. Branch `main` uses the main namespace; every other
-branch uses its isolated, normalized branch namespace. The workflow token is used for GHCR login.
-Only the publishing job has `packages: write`; validation jobs have read-only repository access.
-Buildx cache is stored using GitHub Actions cache scopes.
+publishes each server's immutable commit tag and a branch-scoped `latest` alias, publishes the
+tooling images (`self/cli` and `self/mcp`, see the [CLI reference](cli.md#tooling-images)), and
+publishes the Docker MCP catalog as an OCI artifact with `oras` (installed by
+`oras-project/setup-oras`), importable with `docker mcp catalog pull`. Branch `main` uses the main
+namespace; every other branch uses its isolated, normalized branch namespace. The workflow token is
+used for GHCR login. Only the publishing job has `packages: write`; validation jobs have read-only
+repository access.
+Buildx cache is stored using GitHub Actions cache scopes in `mode=max`, preserving intermediate
+stages. Builds also import inline cache metadata from the last pushed branch-scoped image; server
+images receive their `latest` alias after publication, while tooling images already publish one.
 
 The workflow publishes OCI images and catalog data only. GHCR and GitHub Actions do not provide a
 hosted MCP endpoint.
@@ -48,7 +55,8 @@ After publication, the `verify-pull` job builds the pinned Docker MCP CLI, logs 
 workflow token and runs `scripts/verify-catalog-pull.sh`. The script runs `docker mcp catalog pull`
 on the published reference, then `docker mcp catalog show --format json`, and fails unless the
 catalog title and every enabled server name from `mcp-catalog docker catalog --artifact` appear in
-the output. The script can also be run locally against any reference.
+the output. It then asks `docker mcp tools ls` to start the published servers and fails unless the
+gateway exposes exactly the tool names declared in the catalog.
 
 ### GHCR package setup
 

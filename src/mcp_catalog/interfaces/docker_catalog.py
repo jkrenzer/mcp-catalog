@@ -18,6 +18,7 @@ from .docker_entry import (
     docker_server_entry,
     normalize_description,
 )
+from .docker_runtime import require_docker_engine
 
 __all__ = [
     'CATALOG_ARTIFACT_TYPE',
@@ -270,6 +271,8 @@ def publish_image_from_catalog(
 
 def _run(command: list[str], *, cwd: str | Path | None = None) -> subprocess.CompletedProcess[str]:
     logger.debug('Running external tool %s', command[0])
+    if command[0] == 'docker':
+        require_docker_engine()
     return subprocess.run(command, check=True, text=True, cwd=cwd)
 
 

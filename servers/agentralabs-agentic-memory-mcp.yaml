@@ -26,13 +26,7 @@ build:
 runtime:
   volumes:
     - '{{agentralabs-agentic-memory-mcp.memory_dir}}:/memory'
-secrets:
-  - name: agentralabs-agentic-memory-mcp.token
-    env: AGENTIC_TOKEN
-    example: <AGENTIC_TOKEN>
-    description: >-
-      Only needed when the image serves HTTP (MCP_SERVER_PROTOCOL=http); the
-      Docker MCP gateway always talks to the container over stdio.
+secrets: []
 config:
   - description: Host directory that receives the exported memory snapshots.
     properties:
@@ -40,5 +34,9 @@ config:
         type: string
         description: >-
           Mounted at /memory inside the container; the server writes
-          memory.amem there every 60 seconds and on shutdown.
+          memory.amem there every 60 seconds and on shutdown. If the
+          directory is not in the trusted paths, you might have to 
+          add it explicitly (not just a parent!) to the env
+          MCP_GATEWAY_DOCKER_BIND_ALLOW_WRITABLE_PATHS at docker mcp
+          command invocation!
     required: [memory_dir]

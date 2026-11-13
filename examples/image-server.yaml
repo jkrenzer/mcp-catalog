@@ -1,0 +1,23 @@
+schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json
+name: image-example
+kind: image
+title: Image example
+description: Example of an immutable image-based MCP server.
+enabled: true
+image: ghcr.io/example/server@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+upstream: https://github.com/example/server
+metadata:
+  category: database
+  tags: [example]
+runtime:
+  volumes:
+    - '{{image-example.data_dir}}:/data'
+  disable_network: true
+config:
+  - description: Local data accessed by the server.
+    properties:
+      data_dir:
+        type: string
+        description: Host directory mounted at /data.
+    required: [data_dir]

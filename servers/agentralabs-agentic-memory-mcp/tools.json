@@ -1,0 +1,2013 @@
+[
+  {
+    "arguments": [
+      {
+        "desc": "Summary of the agent's response or action taken",
+        "name": "agent_response",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "Optional topic or category (e.g., 'project-setup', 'debugging')",
+        "name": "topic",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "What the user said or asked",
+        "name": "user_message",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Log a user prompt and/or agent response into the conversation thread. Call this to record what the user said and what you decided to do. Entries are automatically linked into the session's temporal chain.",
+    "name": "conversation_log"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Confidence level (0.0 to 1.0)",
+        "name": "confidence",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "The content of the memory",
+        "name": "content",
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "items": {
+          "type": "object"
+        },
+        "name": "edges",
+        "optional": true,
+        "type": "array"
+      },
+      {
+        "desc": "Type of cognitive event",
+        "name": "event_type",
+        "type": "string"
+      }
+    ],
+    "description": "Add a new cognitive event to the memory graph",
+    "name": "memory_add"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "created_after",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "created_before",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "items": {
+          "type": "string"
+        },
+        "name": "event_types",
+        "optional": true,
+        "type": "array"
+      },
+      {
+        "desc": "",
+        "name": "max_confidence",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "min_confidence",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "",
+        "items": {
+          "type": "integer"
+        },
+        "name": "session_ids",
+        "optional": true,
+        "type": "array"
+      },
+      {
+        "desc": "",
+        "name": "sort_by",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Find memories matching conditions (pattern query)",
+    "name": "memory_query"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "low_confidence_threshold",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "",
+        "name": "max_examples",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "stale_decay_threshold",
+        "optional": true,
+        "type": "number"
+      }
+    ],
+    "description": "Evaluate memory reliability: confidence, staleness, orphan nodes, and unsupported decisions",
+    "name": "memory_quality"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "direction",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "items": {
+          "type": "string"
+        },
+        "name": "edge_types",
+        "optional": true,
+        "type": "array"
+      },
+      {
+        "desc": "",
+        "name": "max_depth",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "min_confidence",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "Starting node ID",
+        "name": "start_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Walk the graph from a starting node, following edges of specified types",
+    "name": "memory_traverse"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "confidence",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "The correct information",
+        "name": "new_content",
+        "type": "string"
+      },
+      {
+        "desc": "ID of the node being corrected",
+        "name": "old_node_id",
+        "type": "integer"
+      },
+      {
+        "desc": "Optional explanation for the correction",
+        "name": "reason",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Record a correction to a previous belief. Creates a new node that supersedes the old one.",
+    "name": "memory_correct"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Node ID to resolve",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Follow the supersedes chain to get the latest version of a belief",
+    "name": "memory_resolve"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "depth",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Get the full context (subgraph) around a node",
+    "name": "memory_context"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "items": {
+          "type": "string"
+        },
+        "name": "event_types",
+        "optional": true,
+        "type": "array"
+      },
+      {
+        "desc": "",
+        "name": "min_similarity",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "",
+        "name": "query_text",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "items": {
+          "type": "number"
+        },
+        "name": "query_vec",
+        "optional": true,
+        "type": "array"
+      },
+      {
+        "desc": "",
+        "name": "top_k",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Find semantically similar memories using vector similarity",
+    "name": "memory_similar"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "max_depth",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Impact analysis — find everything that depends on a given node",
+    "name": "memory_causal"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "range_a",
+        "type": "object"
+      },
+      {
+        "desc": "Same structure as range_a",
+        "name": "range_b",
+        "type": "object"
+      }
+    ],
+    "description": "Compare knowledge across two time periods",
+    "name": "memory_temporal"
+  },
+  {
+    "description": "Get statistics about the memory graph",
+    "name": "memory_stats"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "The claim to verify against stored memories",
+        "name": "claim",
+        "type": "string"
+      },
+      {
+        "desc": "Minimum BM25 score to consider a match (0.0-10.0)",
+        "name": "threshold",
+        "optional": true,
+        "type": "number"
+      }
+    ],
+    "description": "Verify a claim has memory backing. Returns verified/partial/ungrounded status to prevent hallucination about what was previously remembered.",
+    "name": "memory_ground"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Maximum number of evidence items to return",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "The query to search evidence for",
+        "name": "query",
+        "type": "string"
+      }
+    ],
+    "description": "Get detailed evidence for a claim from stored memories. Returns matching memory nodes with full content, timestamps, sessions, and relationships.",
+    "name": "memory_evidence"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Maximum number of suggestions",
+        "name": "limit",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "The query to find suggestions for",
+        "name": "query",
+        "type": "string"
+      }
+    ],
+    "description": "Find similar memories when a claim doesn't match exactly. Useful for correcting misremembered facts or finding related knowledge.",
+    "name": "memory_suggest"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Name for the workspace",
+        "name": "name",
+        "type": "string"
+      }
+    ],
+    "description": "Create a multi-memory workspace for loading and querying multiple .amem files simultaneously. Use this to compare memories across projects or time periods.",
+    "name": "memory_workspace_create"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Optional human-readable label for this context",
+        "name": "label",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "Path to the .amem file",
+        "name": "path",
+        "type": "string"
+      },
+      {
+        "desc": "Role of this context in the workspace",
+        "name": "role",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "ID of the workspace to add to",
+        "name": "workspace_id",
+        "type": "string"
+      }
+    ],
+    "description": "Add an .amem memory file to a workspace. Each file becomes a context that can be queried alongside other loaded memories.",
+    "name": "memory_workspace_add"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "ID of the workspace to list",
+        "name": "workspace_id",
+        "type": "string"
+      }
+    ],
+    "description": "List all loaded memory contexts in a workspace, including their roles, paths, labels, and node counts.",
+    "name": "memory_workspace_list"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Maximum matches per context",
+        "name": "max_per_context",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "Text query to search across all contexts",
+        "name": "query",
+        "type": "string"
+      },
+      {
+        "desc": "ID of the workspace to query",
+        "name": "workspace_id",
+        "type": "string"
+      }
+    ],
+    "description": "Search across all memory contexts in a workspace. Returns matches from each loaded context, enabling cross-project knowledge discovery.",
+    "name": "memory_workspace_query"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Topic/concept to compare across contexts",
+        "name": "item",
+        "type": "string"
+      },
+      {
+        "desc": "Maximum matches per context for comparison",
+        "name": "max_per_context",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "ID of the workspace",
+        "name": "workspace_id",
+        "type": "string"
+      }
+    ],
+    "description": "Compare how a topic appears across different memory contexts. Shows where a concept exists, what's different, and where it's missing.",
+    "name": "memory_workspace_compare"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Topic/concept to cross-reference",
+        "name": "item",
+        "type": "string"
+      },
+      {
+        "desc": "ID of the workspace",
+        "name": "workspace_id",
+        "type": "string"
+      }
+    ],
+    "description": "Cross-reference a topic to find which memory contexts contain it and which don't. Quick way to identify knowledge gaps across projects.",
+    "name": "memory_workspace_xref"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Optional session metadata",
+        "name": "metadata",
+        "optional": true,
+        "type": "object"
+      },
+      {
+        "desc": "Optional explicit session ID",
+        "name": "session_id",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Start a new interaction session",
+    "name": "session_start"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "create_episode",
+        "optional": true,
+        "type": "boolean"
+      },
+      {
+        "desc": "",
+        "name": "session_id",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "Episode summary content",
+        "name": "summary",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "End a session and optionally create an episode summary node",
+    "name": "session_end"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Maximum number of recent memories to load",
+        "name": "limit",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Load context from previous sessions. Call this at the start of every conversation to restore prior context. Returns the last session summary, recent decisions, and key facts.",
+    "name": "memory_session_resume"
+  },
+  {
+    "description": "Get immortality stats: total nodes, oldest, decay status, survival projections",
+    "name": "memory_immortal_stats"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Memory node ID to prove",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Prove a memory exists with evidence chain (supporting edges and connected nodes)",
+    "name": "memory_immortal_prove"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Memory node ID",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Project memory survival probability based on current decay and access patterns",
+    "name": "memory_immortal_project"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "tier",
+        "type": "string"
+      }
+    ],
+    "description": "Move memory to a different storage tier (hot/warm/cold) by adjusting decay",
+    "name": "memory_immortal_tier_move"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Similarity threshold (0-1)",
+        "name": "threshold",
+        "optional": true,
+        "type": "number"
+      }
+    ],
+    "description": "Compress similar memories into summaries, identifying clusters of related nodes",
+    "name": "memory_semantic_compress"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "threshold",
+        "optional": true,
+        "type": "number"
+      }
+    ],
+    "description": "Find duplicate or near-duplicate memories",
+    "name": "memory_semantic_dedup"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "query",
+        "type": "string"
+      }
+    ],
+    "description": "Find semantically similar memories to a query (enhanced with scoring)",
+    "name": "memory_semantic_similar_enhanced"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "num_clusters",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Cluster memories by semantic similarity using keyword overlap",
+    "name": "memory_semantic_cluster"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "topic",
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "name": "window_size",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Optimize context window selection - find the most relevant memories for a topic",
+    "name": "memory_context_optimize"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "depth",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Expand context around a memory by following edges to related nodes",
+    "name": "memory_context_expand"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "items": {
+          "type": "integer"
+        },
+        "name": "node_ids",
+        "type": "array"
+      }
+    ],
+    "description": "Summarize a context window of memories",
+    "name": "memory_context_summarize"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "from_node",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "to_topic",
+        "type": "string"
+      }
+    ],
+    "description": "Navigate between context clusters by finding bridge nodes",
+    "name": "memory_context_navigate"
+  },
+  {
+    "description": "Get memory metabolism health: decay rates, consolidation status, active/dormant ratios",
+    "name": "memory_metabolism_status"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "dry_run",
+        "optional": true,
+        "type": "boolean"
+      }
+    ],
+    "description": "Process and consolidate memories: merge duplicates, strengthen connections",
+    "name": "memory_metabolism_process"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "boost",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Strengthen a memory by increasing confidence and reducing decay",
+    "name": "memory_metabolism_strengthen"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "decay_amount",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "",
+        "name": "min_age_seconds",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Apply decay to stale memories that haven't been accessed recently",
+    "name": "memory_metabolism_decay"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "max_groups",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "threshold",
+        "optional": true,
+        "type": "number"
+      }
+    ],
+    "description": "Consolidate related memories by identifying merge candidates",
+    "name": "memory_metabolism_consolidate"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "context",
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "name": "max_predictions",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Predict what memories will be needed based on current context",
+    "name": "memory_predict"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "context",
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "name": "count",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Preload predicted memories into hot tier",
+    "name": "memory_predict_preload"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "items": {
+          "type": "integer"
+        },
+        "name": "actual_ids",
+        "type": "array"
+      },
+      {
+        "desc": "",
+        "items": {
+          "type": "integer"
+        },
+        "name": "predicted_ids",
+        "type": "array"
+      }
+    ],
+    "description": "Check prediction accuracy by comparing predicted vs actually accessed memories",
+    "name": "memory_predict_accuracy"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "feedback",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "name": "prediction_id",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "was_useful",
+        "type": "boolean"
+      }
+    ],
+    "description": "Provide feedback on prediction quality to improve future predictions",
+    "name": "memory_predict_feedback"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "horizon",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Prophecy about memory future: which memories will become important or fade",
+    "name": "memory_prophecy"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Find memories with similar trajectory/prophecy patterns",
+    "name": "memory_prophecy_similar"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "session_id",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Analyze memory regret: what should have been saved or strengthened",
+    "name": "memory_prophecy_regret"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Track prophecy accuracy over time",
+    "name": "memory_prophecy_track"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "alternative_content",
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "What-if analysis: what would happen if a memory was different",
+    "name": "memory_counterfactual_what_if"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "scenario_a",
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "name": "scenario_b",
+        "type": "string"
+      }
+    ],
+    "description": "Compare two counterfactual scenarios",
+    "name": "memory_counterfactual_compare"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Extract insights from counterfactual analysis",
+    "name": "memory_counterfactual_insights"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "items": {
+          "type": "string"
+        },
+        "name": "scenarios",
+        "type": "array"
+      }
+    ],
+    "description": "Find the best counterfactual scenario for a decision",
+    "name": "memory_counterfactual_best"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "content",
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "name": "threshold",
+        "optional": true,
+        "type": "number"
+      }
+    ],
+    "description": "Check for déjà vu: find patterns that have occurred before",
+    "name": "memory_dejavu_check"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Get history of déjà vu events (recurring patterns)",
+    "name": "memory_dejavu_history"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "min_occurrences",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Find recurring déjà vu patterns across sessions",
+    "name": "memory_dejavu_patterns"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "was_true_dejavu",
+        "type": "boolean"
+      }
+    ],
+    "description": "Provide feedback on déjà vu detection accuracy",
+    "name": "memory_dejavu_feedback"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "max_depth",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "List ancestor memory lineage by tracing supersedes edges backward",
+    "name": "memory_ancestor_list"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "ancestor_id",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Inherit properties from ancestor memories (confidence, edges)",
+    "name": "memory_ancestor_inherit"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Verify ancestor memory authenticity and lineage integrity",
+    "name": "memory_ancestor_verify"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "from_id",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "to_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Bequeath memory properties to descendant nodes",
+    "name": "memory_ancestor_bequeath"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "pool_name",
+        "type": "string"
+      }
+    ],
+    "description": "Join a collective memory pool (workspace-based)",
+    "name": "memory_collective_join"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "pool_name",
+        "type": "string"
+      }
+    ],
+    "description": "Contribute a memory to the collective pool",
+    "name": "memory_collective_contribute"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "pool_name",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "name": "query",
+        "type": "string"
+      }
+    ],
+    "description": "Query across collective memories",
+    "name": "memory_collective_query"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Endorse a collective memory (increase trust)",
+    "name": "memory_collective_endorse"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_id",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "reason",
+        "type": "string"
+      }
+    ],
+    "description": "Challenge a collective memory (flag for review)",
+    "name": "memory_collective_challenge"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "max_pairs",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "threshold",
+        "optional": true,
+        "type": "number"
+      }
+    ],
+    "description": "Analyze memories for fusion potential (mergeable pairs)",
+    "name": "memory_fusion_analyze"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_a",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "node_b",
+        "type": "integer"
+      }
+    ],
+    "description": "Execute memory fusion between two nodes",
+    "name": "memory_fusion_execute"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_a",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "node_b",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "strategy",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Resolve conflicts during memory fusion",
+    "name": "memory_fusion_resolve"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "node_a",
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "node_b",
+        "type": "integer"
+      }
+    ],
+    "description": "Preview what a fusion result would look like",
+    "name": "memory_fusion_preview"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "target_path",
+        "type": "string"
+      }
+    ],
+    "description": "Link to another memory system for cross-system queries",
+    "name": "memory_telepathy_link"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "direction",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "",
+        "name": "target_path",
+        "type": "string"
+      }
+    ],
+    "description": "Sync linked memories with another system",
+    "name": "memory_telepathy_sync"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "query",
+        "type": "string"
+      }
+    ],
+    "description": "Query across linked memory systems",
+    "name": "memory_telepathy_query"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "",
+        "name": "since_session",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "",
+        "name": "target_path",
+        "type": "string"
+      }
+    ],
+    "description": "Stream memory updates to a linked system",
+    "name": "memory_telepathy_stream"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Max search depth (default 3)",
+        "name": "max_depth",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "End timestamp (optional)",
+        "name": "time_end",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "Start timestamp (optional)",
+        "name": "time_start",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "Topic to search for traces",
+        "name": "topic",
+        "type": "string"
+      }
+    ],
+    "description": "Start archaeological dig to recover lost/deleted memories in a topic or time range",
+    "name": "memory_archaeology_dig"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Central node to explore",
+        "name": "node_id",
+        "type": "integer"
+      },
+      {
+        "desc": "Search radius (default 2)",
+        "name": "radius",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Get artifacts found near a node — references, cached summaries, pattern implications",
+    "name": "memory_archaeology_artifacts"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Node IDs of artifacts to use for reconstruction",
+        "items": {
+          "type": "integer"
+        },
+        "name": "artifact_ids",
+        "optional": true,
+        "type": "array"
+      },
+      {
+        "desc": "Topic of lost memory to reconstruct",
+        "name": "topic",
+        "type": "string"
+      }
+    ],
+    "description": "Attempt to reconstruct a lost memory by combining artifacts and traces",
+    "name": "memory_archaeology_reconstruct"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Node ID of reconstructed memory to verify",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Verify a reconstruction against existing evidence and supporting edges",
+    "name": "memory_archaeology_verify"
+  },
+  {
+    "description": "Get holographic memory status: shard distribution, redundancy, reconstruction readiness",
+    "name": "memory_holographic_status"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Node ID to reconstruct from shards",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Attempt to reconstruct a node from surrounding shards (edges and neighbors)",
+    "name": "memory_holographic_reconstruct"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Percentage of nodes to simulate losing (0-100)",
+        "name": "loss_percentage",
+        "type": "number"
+      },
+      {
+        "desc": "Random seed for reproducibility",
+        "name": "seed",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Simulate shard loss: what happens if N% of memory is lost?",
+    "name": "memory_holographic_simulate"
+  },
+  {
+    "description": "Distribute memory shards: report on how well-connected each event type is",
+    "name": "memory_holographic_distribute"
+  },
+  {
+    "description": "Get immune system status: health score, threats detected, quarantined items",
+    "name": "memory_immune_status"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Max results to return (default 20)",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "Type of scan: full, contradictions, low_confidence, anomalies (default: full)",
+        "name": "scan_type",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Scan memory for threats: contradictions, low confidence, injection patterns, anomalies",
+    "name": "memory_immune_scan"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Node to quarantine",
+        "name": "node_id",
+        "type": "integer"
+      },
+      {
+        "desc": "Reason for quarantine",
+        "name": "reason",
+        "type": "string"
+      }
+    ],
+    "description": "Quarantine a suspicious memory by setting its confidence to 0 and marking it",
+    "name": "memory_immune_quarantine"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Confidence to restore (default 0.5)",
+        "name": "confidence",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "Node to release",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Release a quarantined memory by restoring its confidence",
+    "name": "memory_immune_release"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Example nodes exhibiting this threat",
+        "items": {
+          "type": "integer"
+        },
+        "name": "example_node_ids",
+        "optional": true,
+        "type": "array"
+      },
+      {
+        "desc": "Description of threat pattern to detect",
+        "name": "threat_pattern",
+        "type": "string"
+      },
+      {
+        "desc": "Type: FalseMemory, Corruption, Contradiction, Replay, Poisoning",
+        "name": "threat_type",
+        "type": "string"
+      }
+    ],
+    "description": "Train a new antibody: define a threat pattern to auto-detect in future scans",
+    "name": "memory_immune_train"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Reason for initiating phoenix protocol",
+        "name": "reason",
+        "type": "string"
+      },
+      {
+        "desc": "What to recover: all, recent, critical, topic-specific",
+        "name": "recovery_target",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Initiate Phoenix Protocol: begin full memory recovery from external traces",
+    "name": "memory_phoenix_initiate"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Max traces to gather (default 50)",
+        "name": "max_traces",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "Trace source: sessions, types, edges, high_confidence, all (default: all)",
+        "name": "source",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Gather external traces for phoenix recovery: session data, type data, edge chains",
+    "name": "memory_phoenix_gather"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Min confidence threshold for reconstruction (default 0.3)",
+        "name": "min_confidence",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "Strategy: conservative (high-conf only), balanced, aggressive (all traces)",
+        "name": "strategy",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Reconstruct memory from gathered traces — the actual rebirth step",
+    "name": "memory_phoenix_reconstruct"
+  },
+  {
+    "description": "Get Phoenix Protocol rebirth status: progress, recovery confidence, gaps",
+    "name": "memory_phoenix_status"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Filter by type: fact, decision, inference, correction, skill, episode (optional)",
+        "name": "event_type",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Get complete knowledge inventory: topics, skills, facts, decisions, episodes by type",
+    "name": "memory_meta_inventory"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Min coverage threshold (default 0.3)",
+        "name": "min_coverage",
+        "optional": true,
+        "type": "number"
+      }
+    ],
+    "description": "Analyze knowledge gaps: missing types, orphan nodes, low-coverage topics, outdated info",
+    "name": "memory_meta_gaps"
+  },
+  {
+    "description": "Get confidence calibration: are confidence scores accurate? Over/under-confident?",
+    "name": "memory_meta_calibration"
+  },
+  {
+    "description": "Assess memory capabilities: what can this memory system do well vs poorly?",
+    "name": "memory_meta_capabilities"
+  },
+  {
+    "description": "Get dream status: current state (awake/sleeping/REM), pending consolidations, insights found",
+    "name": "memory_dream_status"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Type: consolidation, integration, pattern_discovery, cleanup, exploration (default: consolidation)",
+        "name": "dream_type",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "Intensity: light, deep, rem, lucid (default: deep)",
+        "name": "intensity",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Start a dream cycle: consolidate, find patterns, strengthen connections",
+    "name": "memory_dream_start"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Whether to apply discovered insights (default true)",
+        "name": "apply_insights",
+        "optional": true,
+        "type": "boolean"
+      }
+    ],
+    "description": "Wake from dream and apply discovered insights",
+    "name": "memory_dream_wake"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Max insights to return (default 20)",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Get insights from the last dream cycle: patterns, consolidations, new connections",
+    "name": "memory_dream_insights"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Max history entries (default 10)",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Get dream history: past dream cycles, types, insights discovered",
+    "name": "memory_dream_history"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Max results (default 20)",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "Min confidence (default 0.0)",
+        "name": "min_confidence",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "Filter beliefs by topic (optional)",
+        "name": "topic",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "List current beliefs (facts and decisions) with confidence and revision history",
+    "name": "memory_belief_list"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Node ID of belief to trace",
+        "name": "node_id",
+        "type": "integer"
+      }
+    ],
+    "description": "Get the evolution history of a specific belief through supersedes chains",
+    "name": "memory_belief_history"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Confidence in new belief (default 0.8)",
+        "name": "confidence",
+        "optional": true,
+        "type": "number"
+      },
+      {
+        "desc": "New belief content",
+        "name": "new_content",
+        "type": "string"
+      },
+      {
+        "desc": "Node ID of belief to revise",
+        "name": "old_node_id",
+        "type": "integer"
+      },
+      {
+        "desc": "Reason for revision",
+        "name": "reason",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Propose a belief revision: create new belief that supersedes old one",
+    "name": "memory_belief_revise"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Max conflicts (default 20)",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Find conflicting beliefs: contradictions between facts/decisions",
+    "name": "memory_belief_conflicts"
+  },
+  {
+    "description": "Get cognitive load status: retrieval pressure, cache state, memory efficiency",
+    "name": "memory_load_status"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Action: status, top_accessed, cold_items (default: status)",
+        "name": "action",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "Max items (default 20)",
+        "name": "limit",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Manage memory cache: view most-accessed memories that should be hot-cached",
+    "name": "memory_load_cache"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Max items to prefetch (default 10)",
+        "name": "max_items",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "Topic to prefetch memories for",
+        "name": "topic",
+        "type": "string"
+      }
+    ],
+    "description": "Prefetch memories related to a topic to reduce future retrieval latency",
+    "name": "memory_load_prefetch"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Strategy: min_latency, max_throughput, balanced, adaptive (default: balanced)",
+        "name": "strategy",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "Task description to optimize for",
+        "name": "task",
+        "type": "string"
+      }
+    ],
+    "description": "Optimize memory for a specific task: suggest caching, prefetching, pruning strategies",
+    "name": "memory_load_optimize"
+  },
+  {
+    "description": "Get singularity status: connection to universal knowledge, trust boundaries, access levels",
+    "name": "memory_singularity_status"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Max results (default 20)",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "Knowledge query",
+        "name": "query",
+        "type": "string"
+      },
+      {
+        "desc": "Sources to query: agent, collective, ancestral, public (default: all)",
+        "items": {
+          "type": "string"
+        },
+        "name": "sources",
+        "optional": true,
+        "type": "array"
+      }
+    ],
+    "description": "Query universal knowledge: search across all available knowledge sources",
+    "name": "memory_singularity_query"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Access level: query, copy, reference, integrate (default: reference)",
+        "name": "access_level",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "Node IDs to contribute",
+        "items": {
+          "type": "integer"
+        },
+        "name": "node_ids",
+        "type": "array"
+      }
+    ],
+    "description": "Contribute knowledge to the singularity: mark memories for universal sharing",
+    "name": "memory_singularity_contribute"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Action: status, set_boundary, verify_source",
+        "name": "action",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "Source to manage trust for",
+        "name": "source",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "Trust level 0.0-1.0 (for set_boundary)",
+        "name": "trust_level",
+        "optional": true,
+        "type": "number"
+      }
+    ],
+    "description": "Manage trust boundaries for singularity: what to auto-integrate vs require approval",
+    "name": "memory_singularity_trust"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Window around timestamp (default 3600)",
+        "name": "range_seconds",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "Target timestamp to travel to",
+        "name": "timestamp",
+        "type": "integer"
+      }
+    ],
+    "description": "Travel to a point in time: see memory state at any past timestamp",
+    "name": "memory_temporal_travel"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Hours to project into the future (default 24)",
+        "name": "hours_ahead",
+        "optional": true,
+        "type": "integer"
+      },
+      {
+        "desc": "Scenario: current_rate, accelerated, dormant (default: current_rate)",
+        "name": "scenario",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Project future memory state: estimate growth, decay, and knowledge evolution",
+    "name": "memory_temporal_project"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "First timestamp",
+        "name": "time_a",
+        "type": "integer"
+      },
+      {
+        "desc": "Second timestamp",
+        "name": "time_b",
+        "type": "integer"
+      }
+    ],
+    "description": "Compare memory state between two time points: what changed, what was added, what decayed",
+    "name": "memory_temporal_compare"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Max paradoxes to report (default 20)",
+        "name": "max_results",
+        "optional": true,
+        "type": "integer"
+      }
+    ],
+    "description": "Check for temporal paradoxes: contradictions, causal loops, timestamp anomalies",
+    "name": "memory_temporal_paradox"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Event types to include (default: all)",
+        "items": {
+          "type": "string"
+        },
+        "name": "include_types",
+        "optional": true,
+        "type": "array"
+      },
+      {
+        "desc": "Name for this crystal",
+        "name": "name",
+        "type": "string"
+      }
+    ],
+    "description": "Crystallize consciousness: capture core memories, patterns, values, personality into transferable form",
+    "name": "memory_crystal_create"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Crystal to transfer",
+        "name": "crystal_name",
+        "type": "string"
+      },
+      {
+        "desc": "Target agent identifier",
+        "name": "target",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "Type: full, copy, merge, inspire (default: copy)",
+        "name": "transfer_type",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Transfer a consciousness crystal: prepare for integration into another agent",
+    "name": "memory_crystal_transfer"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Aspect: overview, memories, patterns, personality, values (default: overview)",
+        "name": "aspect",
+        "optional": true,
+        "type": "string"
+      },
+      {
+        "desc": "Crystal to inspect",
+        "name": "crystal_name",
+        "type": "string"
+      }
+    ],
+    "description": "Inspect a consciousness crystal: see contents, patterns, personality, values",
+    "name": "memory_crystal_inspect"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Crystals to merge",
+        "items": {
+          "type": "string"
+        },
+        "name": "crystal_names",
+        "type": "array"
+      },
+      {
+        "desc": "Strategy: union, intersection, weighted, curated (default: union)",
+        "name": "merge_strategy",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Merge consciousness crystals: combine essences of multiple agents",
+    "name": "memory_crystal_merge"
+  },
+  {
+    "description": "Get transcendence status: distribution, substrate independence, persistence estimate",
+    "name": "memory_transcend_status"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Target substrates: cloud, edge, peer, physical (default: all)",
+        "items": {
+          "type": "string"
+        },
+        "name": "target_substrates",
+        "optional": true,
+        "type": "array"
+      }
+    ],
+    "description": "Distribute memory across substrates for transcendence: report distribution readiness",
+    "name": "memory_transcend_distribute"
+  },
+  {
+    "description": "Verify transcendence: check integrity, distribution, substrate independence",
+    "name": "memory_transcend_verify"
+  },
+  {
+    "arguments": [
+      {
+        "desc": "Name for this eternal aspect",
+        "name": "aspect_name",
+        "type": "string"
+      },
+      {
+        "desc": "Core memory node IDs to preserve eternally",
+        "items": {
+          "type": "integer"
+        },
+        "name": "node_ids",
+        "optional": true,
+        "type": "array"
+      },
+      {
+        "desc": "Method: replication, blockchain, physical, social, public, systemic (default: replication)",
+        "name": "preservation_method",
+        "optional": true,
+        "type": "string"
+      }
+    ],
+    "description": "Create an eternal aspect: mark core memories for permanent preservation beyond any failure mode",
+    "name": "memory_transcend_eternal"
+  }
+]

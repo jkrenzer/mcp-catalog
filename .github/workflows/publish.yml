@@ -1,0 +1,209 @@
+name: Publish catalog and server images
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  validate:
+    name: validate before publication
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # actions/setup-python v7.1.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+
+      - name: Install package and CI tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --group dev -e '.[mcp]'
+
+      - name: Validate catalog manifests
+        run: mcp-catalog validate catalog.yaml
+
+      - name: Check formatting and lint
+        run: |
+          ruff format --check .
+          ruff check .
+
+      - name: Type check
+        run: mypy src/mcp_catalog
+
+      - name: Run tests
+        run: pytest
+
+      - name: Check generated schemas
+        run: mcp-catalog schema check schemas
+
+  publish:
+    name: publish images
+    needs: validate
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # actions/setup-python v7.1.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+
+      - name: Install package
+        run: python -m pip install .
+
+      # docker/setup-buildx-action v4.4.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+
+      # docker/login-action v4.8.0
+      - name: Log in to GHCR with the workflow token
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish server images
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          CATALOG_COMMIT: ${{ github.sha }}
+          UPSTREAM_REPOSITORY_TOKEN: ${{ secrets.UPSTREAM_REPOSITORY_TOKEN }}
+        run: |
+          if [ -n "${UPSTREAM_REPOSITORY_TOKEN:-}" ]; then
+            encoded_token="$(printf 'x-access-token:%s' "$UPSTREAM_REPOSITORY_TOKEN" | base64 -w0)"
+            printf '::add-mask::%s\n' "$encoded_token"
+            export GIT_CONFIG_COUNT=1
+            export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+            export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $encoded_token"
+          fi
+
+          mcp-catalog plan catalog.yaml \
+            --branch "$BRANCH_NAME" \
+            --catalog-commit "$CATALOG_COMMIT" \
+            --output build-plan.json
+
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          branch = os.environ['BRANCH_NAME']
+          commit = os.environ['CATALOG_COMMIT']
+          with open('build-plan.json', encoding='utf-8') as plan_file:
+              plan = json.load(plan_file)
+
+          for build in plan['builds']:
+              server = build['name']
+              cache_scope = f'mcp-catalog-server-{server}'
+              command = [
+                  'mcp-catalog', 'image', 'build', server, 'catalog.yaml',
+                  '--branch', branch,
+                  '--catalog-commit', commit,
+                  '--push',
+              ]
+              for platform in build['platforms']:
+                  command.extend(['--platform', platform])
+              command.extend([
+                  '--cache-from', f'type=gha,scope={cache_scope}',
+                  '--cache-to', f'type=gha,scope={cache_scope},mode=max',
+              ])
+              subprocess.run(command, check=True)
+          PY
+
+      - name: Build and publish mcp-catalog tooling images
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          CATALOG_COMMIT: ${{ github.sha }}
+        run: |
+          for component in cli mcp; do
+            mcp-catalog self build "$component" catalog.yaml \
+              --branch "$BRANCH_NAME" \
+              --catalog-commit "$CATALOG_COMMIT" \
+              --push \
+              --cache-from "type=gha,scope=mcp-catalog-self-$component" \
+              --cache-to "type=gha,scope=mcp-catalog-self-$component,mode=max"
+          done
+
+      # oras-project/setup-oras v2.0.3
+      - uses: oras-project/setup-oras@5e2f2482b30b0cb3e14e67f89a80c88c659a7c63
+
+      - name: Publish Docker MCP catalog artifact
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          CATALOG_COMMIT: ${{ github.sha }}
+        run: |
+          echo "$GITHUB_TOKEN" | oras login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          mcp-catalog catalog publish catalog.yaml \
+            --branch "$BRANCH_NAME" \
+            --catalog-commit "$CATALOG_COMMIT"
+
+  verify-pull:
+    name: verify catalog import with docker mcp
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: docker/mcp-gateway
+          ref: v0.44.3
+          path: mcp-gateway
+
+      # actions/setup-python v7.1.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+
+      # actions/setup-go v7.0.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.26.10'
+
+      - name: Build pinned Docker MCP CLI/Gateway
+        run: |
+          mkdir -p "$HOME/.docker/cli-plugins" mcp-gateway/dist
+          make -C mcp-gateway docker-mcp
+          docker mcp --help
+
+      - name: Install package
+        run: python -m pip install .
+
+      # docker/login-action v4.8.0
+      - name: Log in to GHCR with the workflow token
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull the published catalog with docker mcp
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          CATALOG_COMMIT: ${{ github.sha }}
+        run: |
+          reference="$(python -c 'import os; from mcp_catalog.branching import catalog_reference; print(catalog_reference(os.environ["BRANCH_NAME"]))')"
+          mcp-catalog docker catalog catalog.yaml --artifact \
+            --branch "$BRANCH_NAME" \
+            --catalog-commit "$CATALOG_COMMIT" \
+            --output expected-catalog.json
+          bash scripts/verify-catalog-pull.sh "$reference" expected-catalog.json

@@ -1,0 +1,44 @@
+schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json
+name: agentralabs-agentic-memory-mcp
+kind: build
+title: Agentralabs Agentic Memory MCP
+description: >
+  Persistent cognitive graph memory for AI agents — facts,
+  decisions, reasoning chains, corrections. 16 query
+  types, sub-millisecond.
+enabled: true
+icon: https://www.google.com/s2/favicons?domain=agentralabs.tech&sz=64
+readme: https://github.com/jkrenzer/mcp-catalog/blob/main/servers/agentralabs-agentic-memory-mcp/README.md
+upstream: https://github.com/agentralabs/agentic-memory
+metadata:
+  category: memory
+  tags: [memory, knowledge-graph, agents]
+  license: MIT
+  owner: agentralabs
+tools_file: ./agentralabs-agentic-memory-mcp/tools.json
+source:
+  context: ./agentralabs-agentic-memory-mcp
+  dockerfile: Dockerfile
+build:
+  platforms: [linux/amd64]
+  args: {}
+runtime:
+  volumes:
+    - '{{agentralabs-agentic-memory-mcp.memory_dir}}:/memory'
+secrets:
+  - name: agentralabs-agentic-memory-mcp.token
+    env: AGENTIC_TOKEN
+    example: <AGENTIC_TOKEN>
+    description: >-
+      Only needed when the image serves HTTP (MCP_SERVER_PROTOCOL=http); the
+      Docker MCP gateway always talks to the container over stdio.
+config:
+  - description: Host directory that receives the exported memory snapshots.
+    properties:
+      memory_dir:
+        type: string
+        description: >-
+          Mounted at /memory inside the container; the server writes
+          memory.amem there every 60 seconds and on shutdown.
+    required: [memory_dir]

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mcp-catalog": {
+      "type": "stdio",
+      "command": "mcp-catalog",
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "env": {}
+    }
+  }
+}

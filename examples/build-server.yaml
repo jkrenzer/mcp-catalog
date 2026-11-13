@@ -1,0 +1,52 @@
+schema_version: 1
+schema_kind: https://mcp-catalog.schema.krenzer.space/server.schema.json
+name: build-example
+kind: build
+title: Build example
+description: Example of a build-from-source MCP server.
+enabled: true
+icon: https://www.google.com/s2/favicons?domain=example.com&sz=64
+readme: https://github.com/example/mcp-server#readme
+date_added: 2026-01-15T00:00:00Z
+metadata:
+  category: devops
+  tags: [example, devops]
+  license: MIT
+  owner: example
+source:
+  repository: https://github.com/example/mcp-server.git
+  revision: 0123456789abcdef0123456789abcdef01234567
+  context: .
+  dockerfile: Dockerfile
+build:
+  platforms: [linux/amd64]
+  args: {}
+runtime:
+  command: [--transport=stdio]
+  allow_hosts: [api.example.com:443]
+  env:
+    - name: EXAMPLE_REGION
+      value: '{{build-example.region}}'
+secrets:
+  - name: build-example.api_key
+    env: EXAMPLE_API_KEY
+    example: <EXAMPLE_API_KEY>
+    description: Create an API key in the example.com account settings.
+    required: true
+config:
+  - description: Configure the example.com connection.
+    properties:
+      region:
+        type: string
+        description: Region of the example.com API.
+        default: eu
+    required: [region]
+tools:
+  - name: search
+    description: Search example.com.
+    arguments:
+      - name: query
+        type: string
+        desc: Search terms.
+    annotations:
+      read_only_hint: true

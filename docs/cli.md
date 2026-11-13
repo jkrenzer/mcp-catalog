@@ -44,17 +44,81 @@ selected repository subdirectory; it does not change the calling shell's working
 
 ## Manage servers
 
-Use `--manifest` with a complete, validated server YAML file when adding or replacing a server:
+Add servers from a manifest file, from individual fields, or from both. `--set` takes
+`path=value` pairs (MCP: the `fields` object); the value is parsed as YAML, so numbers, booleans
+and `[a, b]` lists work. `schema_version` and `schema_kind` default to the current schema.
 
 ```bash
 mcp-catalog server list catalog.yaml
 mcp-catalog server show example catalog.yaml
 mcp-catalog server add catalog.yaml --manifest examples/build-server.yaml
+mcp-catalog server add catalog.yaml --set name=demo --set kind=image --set title=Demo \
+  --set description='A demo.' --set image=ghcr.io/example/s@sha256:<digest>
 mcp-catalog server update example catalog.yaml --manifest /tmp/example-updated.yaml
 mcp-catalog server remove example catalog.yaml
 ```
 
-These commands edit either the embedded catalog `servers` list or the individual YAML files in `servers_dir`, according to the catalog layout. The update command keeps the existing server name.
+`server edit` changes individual fields and leaves everything else, including comments, as it was:
+
+```bash
+mcp-catalog server edit example catalog.yaml \
+  --set metadata.license=MIT \
+  --set 'metadata.tags=[web, crawler]' \
+  --set 'secrets[+]={name: example.key, env: EXAMPLE_KEY}' \
+  --set 'runtime.env[name=REGION].value=eu' \
+  --unset 'tools[0]'
+```
+
+| Path | Meaning |
+|------|---------|
+| `metadata.license` | Mapping keys separated by dots; missing mappings are created. |
+| `tools[0].description`, `tools[-1]` | List element by index; negative indices count from the end. |
+| `secrets[+]` | Append to a list (created when missing). |
+| `runtime.env[name=REGION].value` | The list item whose mapping has `name == REGION`. |
+
+Removals run before assignments. Every result is validated before anything is written; a
+failing edit leaves the manifest untouched.
+
+All commands that write (`server add|update|edit|remove`, `upstream update`, `tools capture`)
+accept `--dry-run` (MCP: `dry_run: true`). It runs the same validation, writes nothing and prints
+the unified diff that would be applied.
+
+These commands edit either the embedded catalog `servers` list or the individual YAML files in `servers_dir`, according to the catalog layout. The update command keeps the existing server name and replaces the manifest wholesale; prefer `server edit` for small changes.
+
+### Scaffold a manifest from a repository
+
+```bash
+mcp-catalog server scaffold-from-repo https://github.com/owner/repo --output /tmp/draft.yaml
+```
+
+The repository is shallow-cloned into a temporary directory and read as untrusted data; nothing
+from it is executed. The draft manifest goes to stdout or `--output`; a report goes to stderr (MCP:
+a dict with `manifest`, `found`, `missing` and `notes`):
+
+- **Found**: each field with the file it came from. Sources are the Dockerfile, `pyproject.toml`,
+  `package.json`, `Cargo.toml`, `LICENSE`, the README (heading, first paragraph and environment
+  variable tables) and `.env.example`-style files. Variables that look like credentials become
+  `secrets`; the rest become `config` properties wired through `runtime.env` with `|or:` defaults.
+- **Missing**: each field that could not be determined, whether it is required, what value is
+  expected and how to obtain it. The icon, category, tools and secret requirements always need a
+  human or agent decision.
+- **Notes**: items to review, such as a Dockerfile in a subdirectory or an exposed HTTP port.
+
+An agent can pass the `manifest` straight to `server_add` as `fields` after completing the gaps.
+
+### Capture tools from an image
+
+```bash
+mcp-catalog tools capture example catalog.yaml --dry-run
+mcp-catalog tools capture example catalog.yaml --image ghcr.io/owner/image:tag --env API_KEY=x
+```
+
+This builds the server image locally (or uses `--image`), runs it with `docker run -i`, performs
+the MCP `initialize` and `tools/list` exchange over stdio, and maps the result to the manifest
+`tools` shape (sorted by name and argument name). The tools are written to the manifest's
+`tools_file` when it has one and inline into `tools` otherwise. Docker must be available; the
+devcontainer provides it through the Docker-outside-of-Docker feature. Capturing executes the
+server image, so only capture images you trust.
 
 ## Upstream revisions and build plans
 

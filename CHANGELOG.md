@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- `server add` accepts `--set path=value` fields (MCP: `fields`) on their own or on top of a
+  manifest file, and the new `server edit` changes or removes individual fields in place
+  (`--set`/`--unset`, MCP `set`/`unset`). Paths use dotted keys, `[0]`, `[+]` and `[key=value]`.
+- Every server write command (`add`, `update`, `edit`, `remove`, `upstream update`,
+  `tools capture`) supports `--dry-run` (MCP `dry_run`), which validates and prints the diff.
+- Server writes store the raw manifest instead of a model dump, so unset defaults are no longer
+  written, comments and key order survive, and relative local paths stay relative.
+- `server scaffold-from-repo` (MCP `server_scaffold_from_repo`) drafts a manifest from an upstream
+  repository and reports what it found, what is missing, whether it is required, and what is
+  expected. It reads the Dockerfile, project files, LICENSE, README, `.env` examples and README
+  environment tables.
+- `tools capture` (MCP `tools_capture`) runs a server image over stdio, sends `tools/list` and
+  stores the tools in the manifest (`tools_file` when set, inline otherwise).
 - Server manifests describe every Docker MCP catalog field: icon, readme, upstream, date added,
   metadata, tools, secrets, config, OAuth, prefix, container runtime settings and remote
   transport/headers. The free-form `runtime` and `metadata` mappings became typed models with

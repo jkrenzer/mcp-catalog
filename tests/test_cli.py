@@ -791,7 +791,10 @@ def test_fastmcp_mirrors_public_cli_commands():
         'server_show',
         'server_add',
         'server_update',
+        'server_edit',
         'server_remove',
+        'server_scaffold_from_repo',
+        'tools_capture',
         'upstream_resolve',
         'upstream_update',
         'build_plan',
@@ -838,7 +841,7 @@ def test_fastmcp_stdio_client_lists_and_calls_tools():
                 'branch_slug',
                 {'branch_name': 'feature/test'},
             )
-        assert len(tools) == 20
+        assert len(tools) == 23
         assert not result.is_error
         assert result.content[0].text == 'feature-test-59e07aa6356b'
 

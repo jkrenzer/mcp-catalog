@@ -34,6 +34,14 @@ def upstream_update(
     name: str = typer.Argument(help='Build server name.'),
     catalog_path: Path = typer.Argument(Path('catalog.yaml'), help='Catalog manifest.'),
     ref: str = typer.Option('HEAD', '--ref', help='Remote Git ref to pin.'),
+    dry_run: bool = typer.Option(False, '--dry-run', help='Show the change without writing.'),
 ) -> None:
-    revision = action(lambda: upstream_interface.update_upstream_revision(catalog_path, name, ref))
-    logger.info('Updated %s revision to %s', name, revision)
+    change = action(
+        lambda: upstream_interface.update_upstream_revision(
+            catalog_path, name, ref, dry_run=dry_run
+        )
+    )
+    if change.applied:
+        logger.info('Updated %s revision to %s', name, change.details['revision'])
+    else:
+        typer.echo(change.summary(), nl=False)

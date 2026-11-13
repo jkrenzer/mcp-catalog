@@ -26,7 +26,11 @@ def upstream_update(
     name: str,
     catalog_path: str = 'catalog.yaml',
     ref: str = 'HEAD',
+    dry_run: bool = False,
 ) -> str:
-    """Explicitly resolve and pin a build server's upstream revision."""
-    revision = update_upstream_revision(catalog_path, name, ref)
-    return f'Updated {name} revision to {revision}'
+    """Explicitly resolve and pin a build server's upstream revision.
+
+    With dry_run=true nothing is written and the resulting diff is returned.
+    """
+    change = update_upstream_revision(catalog_path, name, ref, dry_run=dry_run)
+    return change.summary()

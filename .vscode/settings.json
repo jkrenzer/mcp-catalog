@@ -2,6 +2,7 @@
     "conventionalCommits.scopes": [
         "schema",
         "infrastructure",
-        "cli"
+        "cli",
+        "mcp"
     ]
 }

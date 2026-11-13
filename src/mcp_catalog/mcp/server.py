@@ -17,6 +17,7 @@ def load_tools() -> FastMCP:
         schema,
         self_images,
         servers,
+        tools,
         upstream,
         validate,
     )

@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from ..io.yaml import dump_yaml_file, load_yaml_file
 from ..models import BuildServer, GitSourceModel
-from .catalog import (
-    find_server,
-    load_catalog,
-    server_manifest_path,
-    validate_catalog_document,
-    validate_server_document,
-)
+from .catalog import find_server, load_catalog
+from .changes import ChangeSet
+from .servers import edit_server
 
 
 def resolve_upstream_revision(repository: str, ref: str = 'HEAD') -> str:
@@ -37,28 +33,17 @@ def update_upstream_revision(
     catalog_path: str | Path,
     name: str,
     ref: str = 'HEAD',
-) -> str:
-    catalog_path_abs = Path(catalog_path).resolve()
-    document = load_yaml_file(catalog_path_abs)
-    if not isinstance(document, dict):
-        raise ValueError(f'{catalog_path} must contain a YAML mapping.')
-    server = find_server(load_catalog(catalog_path_abs), name)
+    *,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Resolve ``ref`` and pin it as the build server's revision; ``details['revision']``."""
+    server = find_server(load_catalog(catalog_path), name)
     if not isinstance(server, BuildServer):
         raise ValueError(f'Upstream revisions apply only to build servers: {name}')
     if not isinstance(server.source, GitSourceModel):
         raise ValueError(f'Upstream revisions apply only to Git-backed build servers: {name}')
     revision = resolve_upstream_revision(str(server.source.repository), ref)
-    if 'servers' in document:
-        for item in document['servers']:
-            if item.get('name') == name:
-                item['source']['revision'] = revision
-                break
-        validate_catalog_document(document, base_dir=catalog_path_abs.parent)
-        dump_yaml_file(catalog_path_abs, document)
-    else:
-        target = server_manifest_path(catalog_path_abs, document, name)
-        server_document = load_yaml_file(target)
-        server_document['source']['revision'] = revision
-        validate_server_document(server_document, base_dir=target.parent)
-        dump_yaml_file(target, server_document)
-    return revision
+    change = edit_server(
+        catalog_path, name, set_values={'source.revision': revision}, dry_run=dry_run
+    )
+    return replace(change, details={**change.details, 'revision': revision})

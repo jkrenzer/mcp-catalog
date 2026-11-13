@@ -62,7 +62,9 @@ def self_build_command(
     push: bool = typer.Option(
         False, '--push', help='Push directly; supports multi-platform builds.'
     ),
-    cache_from: str | None = typer.Option(None, '--cache-from', help='Buildx cache source.'),
+    cache_from: list[str] | None = typer.Option(
+        None, '--cache-from', help='Buildx cache source; may be repeated.'
+    ),
     cache_to: str | None = typer.Option(None, '--cache-to', help='Buildx cache destination.'),
 ) -> None:
     action(lambda: require_executable('docker'))

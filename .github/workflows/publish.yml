@@ -108,6 +108,7 @@ jobs:
           for build in plan['builds']:
               server = build['name']
               cache_scope = f'mcp-catalog-server-{server}'
+              latest_image = build['image'].rsplit(':', 1)[0] + ':latest'
               command = [
                   'mcp-catalog', 'image', 'build', server, 'catalog.yaml',
                   '--branch', branch,
@@ -118,9 +119,18 @@ jobs:
                   command.extend(['--platform', platform])
               command.extend([
                   '--cache-from', f'type=gha,scope={cache_scope}',
+                  '--cache-from', f'type=registry,ref={latest_image}',
                   '--cache-to', f'type=gha,scope={cache_scope},mode=max',
               ])
               subprocess.run(command, check=True)
+              subprocess.run([
+                  'mcp-catalog', 'test', 'server', server, 'catalog.yaml',
+                  '--image', build['image'],
+              ], check=True)
+              subprocess.run([
+                  'docker', 'buildx', 'imagetools', 'create',
+                  '--tag', latest_image, build['image'],
+              ], check=True)
           PY
 
       - name: Build and publish mcp-catalog tooling images
@@ -207,3 +217,46 @@ jobs:
             --catalog-commit "$CATALOG_COMMIT" \
             --output expected-catalog.json
           bash scripts/verify-catalog-pull.sh "$reference" expected-catalog.json
+
+          mkdir -p "$RUNNER_TEMP/agentic-memory"
+          cat > "$RUNNER_TEMP/mcp-test-config.yaml" <<EOF
+          agentralabs-agentic-memory-mcp:
+            memory_dir: $RUNNER_TEMP/agentic-memory
+          EOF
+          touch "$RUNNER_TEMP/mcp-test-secrets.env"
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          with open('expected-catalog.json', encoding='utf-8') as expected_file:
+              expected = json.load(expected_file)
+          server_names = [
+              entry['snapshot']['server']['name'] for entry in expected['servers']
+          ]
+          if not server_names:
+              raise SystemExit('The published catalog contains no servers to test.')
+
+          result = subprocess.run([
+              'docker', 'mcp', 'tools', 'ls', '--format=json',
+              f'--gateway-arg=--servers={",".join(server_names)}',
+              '--gateway-arg=--verify-signatures=false',
+              f'--gateway-arg=--additional-config={os.environ["RUNNER_TEMP"]}/mcp-test-config.yaml',
+              f'--gateway-arg=--secrets={os.environ["RUNNER_TEMP"]}/mcp-test-secrets.env',
+          ], check=True, capture_output=True, text=True, timeout=300)
+          actual_tools = {tool['name'] for tool in json.loads(result.stdout)}
+          expected_tools = {
+              tool['name']
+              for entry in expected['servers']
+              for tool in entry['snapshot']['server'].get('tools', [])
+          }
+          missing = sorted(expected_tools - actual_tools)
+          unexpected = sorted(actual_tools - expected_tools)
+          if missing or unexpected:
+              if missing:
+                  print(f'Docker MCP is missing expected tools: {", ".join(missing)}')
+              if unexpected:
+                  print(f'Docker MCP exposed unexpected tools: {", ".join(unexpected)}')
+              raise SystemExit(1)
+          print(f'Docker MCP started {len(server_names)} server(s) and exposed all {len(expected_tools)} expected tool(s).')
+          PY

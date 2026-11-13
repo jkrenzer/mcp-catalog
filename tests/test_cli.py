@@ -314,7 +314,7 @@ def test_image_build_push_uses_all_platforms_and_build_cache(tmp_path, monkeypat
         model,
         image='example/local:latest',
         push=True,
-        cache_from='type=gha,scope=example',
+        cache_from=['type=gha,scope=example', 'type=registry,ref=example/local:latest'],
         cache_to='type=gha,scope=example,mode=max',
     )
 
@@ -322,8 +322,15 @@ def test_image_build_push_uses_all_platforms_and_build_cache(tmp_path, monkeypat
     assert '--push' in command
     assert '--load' not in command
     assert command[command.index('--platform') + 1] == 'linux/amd64,linux/arm64'
-    assert command[command.index('--cache-from') + 1] == 'type=gha,scope=example'
+    cache_sources = [
+        command[index + 1] for index, option in enumerate(command) if option == '--cache-from'
+    ]
+    assert cache_sources == [
+        'type=gha,scope=example',
+        'type=registry,ref=example/local:latest',
+    ]
     assert command[command.index('--cache-to') + 1] == 'type=gha,scope=example,mode=max'
+    assert 'BUILDKIT_INLINE_CACHE=1' in command
 
 
 def test_docker_build_does_not_inherit_git_credentials(monkeypatch):
@@ -807,6 +814,41 @@ def test_fastmcp_mirrors_public_cli_commands():
         'branch_slug',
         'self_plan',
         'self_build',
+    }
+
+
+def test_test_server_cli_passes_options_to_mcp_test(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_test_server_image(catalog_path, name, **kwargs):
+        seen.update(catalog_path=catalog_path, name=name, **kwargs)
+        return 2
+
+    monkeypatch.setattr('mcp_catalog.cli.test.test_server_image', fake_test_server_image)
+
+    result = runner.invoke(
+        app,
+        [
+            'test',
+            'server',
+            'example',
+            str(tmp_path / 'catalog.yaml'),
+            '--image',
+            'example/image:1',
+            '--env',
+            'KEY=value',
+            '--timeout',
+            '12',
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert seen == {
+        'catalog_path': tmp_path / 'catalog.yaml',
+        'name': 'example',
+        'image': 'example/image:1',
+        'env': {'KEY': 'value'},
+        'timeout': 12.0,
     }
 
 

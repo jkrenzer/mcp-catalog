@@ -120,6 +120,19 @@ the MCP `initialize` and `tools/list` exchange over stdio, and maps the result t
 devcontainer provides it through the Docker-outside-of-Docker feature. Capturing executes the
 server image, so only capture images you trust.
 
+### Test an MCP server image
+
+```bash
+mcp-catalog test server example catalog.yaml
+mcp-catalog test server example catalog.yaml --image ghcr.io/owner/image:tag --env API_KEY=x
+```
+
+This runs the configured image server, or builds a build server locally unless `--image` is
+provided. It performs the MCP `initialize` and `tools/list` exchange over stdio, including
+pagination, and reports success only if the server responds successfully. `--env` can be repeated
+to pass `NAME=value` pairs to the container, and `--timeout` sets the wait time for each MCP
+request. Unlike `tools capture`, this command does not modify the catalog.
+
 ## Upstream revisions and build plans
 
 Resolving an upstream ref is read-only. Updating a revision is a separate, explicit operation:
@@ -147,6 +160,10 @@ mcp-catalog image build example catalog.yaml --branch main --push \
   --cache-from type=gha,scope=example \
   --cache-to type=gha,scope=example,mode=max
 ```
+
+`--cache-from` may be repeated to import from multiple sources. Push builds enable inline cache
+metadata in the image; tooling image builds also use their branch-scoped `latest` tag as a cache
+source.
 
 For a local source, omit `repository` and `revision`:
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from ..logging_config import get_logger
-from ..models import BuildServer, ImageServer
+from ..models import BuildServer, ImageServer, ServerModel
 from .builds import build_image_for_server
 from .catalog import find_server, load_catalog
 from .changes import ChangeSet
@@ -179,6 +179,34 @@ def capture_tools(
     return tools_from_list_result(tools)
 
 
+def _resolve_server_image(
+    catalog_path: str | Path, name: str, image: str | None
+) -> tuple[ServerModel, str]:
+    catalog = load_catalog(catalog_path)
+    server = find_server(catalog, name)
+    if image is None:
+        if isinstance(server, BuildServer):
+            image = build_image_for_server(catalog, name=name)
+        elif isinstance(server, ImageServer):
+            image = server.image
+        else:
+            raise ValueError(f'Only build and image servers can be tested: {name}')
+    return server, image
+
+
+def test_server_image(
+    catalog_path: str | Path,
+    name: str,
+    *,
+    image: str | None = None,
+    env: dict[str, str] | None = None,
+    timeout: float = 60.0,
+) -> int:
+    """Verify that a catalog server initializes and answers MCP ``tools/list``."""
+    _, image = _resolve_server_image(catalog_path, name, image)
+    return len(capture_tools(image, env=env, timeout=timeout))
+
+
 def capture_server_tools(
     catalog_path: str | Path,
     name: str,
@@ -193,15 +221,7 @@ def capture_server_tools(
     Build servers are built locally first unless ``image`` is given. Tools go to the
     manifest's ``tools_file`` when it has one and otherwise inline into ``tools``.
     """
-    catalog = load_catalog(catalog_path)
-    server = find_server(catalog, name)
-    if image is None:
-        if isinstance(server, BuildServer):
-            image = build_image_for_server(catalog, name=name)
-        elif isinstance(server, ImageServer):
-            image = server.image
-        else:
-            raise ValueError(f'Only build and image servers can be captured: {name}')
+    server, image = _resolve_server_image(catalog_path, name, image)
     tools = capture_tools(image, env=env, timeout=timeout)
     if not tools:
         raise ValueError(f'{image} reported no tools.')

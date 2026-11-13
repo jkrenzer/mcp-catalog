@@ -91,7 +91,7 @@ def build_server_image(
     image: str,
     platform: str | list[str] | None = None,
     push: bool = False,
-    cache_from: str | None = None,
+    cache_from: str | list[str] | None = None,
     cache_to: str | None = None,
     labels: dict[str, str] | None = None,
 ) -> None:
@@ -168,7 +168,7 @@ def _run_docker_build(
     platforms: list[str],
     *,
     push: bool,
-    cache_from: str | None,
+    cache_from: str | list[str] | None,
     cache_to: str | None,
     labels: dict[str, str] | None = None,
 ) -> None:
@@ -184,12 +184,15 @@ def _run_docker_build(
         '--tag',
         image,
     ]
-    if cache_from:
-        command.extend(['--cache-from', cache_from])
+    cache_sources = [cache_from] if isinstance(cache_from, str) else cache_from or []
+    for cache_source in cache_sources:
+        command.extend(['--cache-from', cache_source])
     if cache_to:
         command.extend(['--cache-to', cache_to])
     for name, value in sorted(server.build.args.items()):
         command.extend(['--build-arg', f'{name}={value}'])
+    if push:
+        command.extend(['--build-arg', 'BUILDKIT_INLINE_CACHE=1'])
     command.extend(label_arguments(labels))
     command.append(str(context))
     _run(command)
@@ -203,7 +206,7 @@ def build_image_for_server(
     branch: str = 'main',
     platform: str | list[str] | None = None,
     push: bool = False,
-    cache_from: str | None = None,
+    cache_from: str | list[str] | None = None,
     cache_to: str | None = None,
 ) -> str:
     server = find_server(catalog, name)

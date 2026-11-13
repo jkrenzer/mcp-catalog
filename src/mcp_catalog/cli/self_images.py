@@ -7,7 +7,6 @@ import typer
 
 from ..interfaces.builds import current_commit
 from ..interfaces.catalog import load_catalog
-from ..interfaces.docker_catalog import require_executable
 from ..interfaces.self_images import build_self_image, self_image_plan
 from .common import action, logger
 
@@ -67,7 +66,6 @@ def self_build_command(
     ),
     cache_to: str | None = typer.Option(None, '--cache-to', help='Buildx cache destination.'),
 ) -> None:
-    action(lambda: require_executable('docker'))
     repository = action(lambda: _repository(catalog_path))
     commit = action(lambda: catalog_commit or current_commit())
     image = action(

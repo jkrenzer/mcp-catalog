@@ -14,6 +14,7 @@ from ..models import BuildServer, ImageServer, ServerModel
 from .builds import build_image_for_server
 from .catalog import find_server, load_catalog
 from .changes import ChangeSet
+from .docker_runtime import require_docker_engine
 from .servers import edit_server
 
 logger = get_logger(__name__)
@@ -148,6 +149,7 @@ def capture_tools(
     timeout: float = 60.0,
 ) -> list[dict[str, Any]]:
     """Run ``image`` over stdio and return its tools in the manifest ``tools`` shape."""
+    require_docker_engine()
     command = ['docker', 'run', '-i', '--rm']
     for name, value in sorted((env or {}).items()):
         command += ['-e', f'{name}={value}']

@@ -133,6 +133,12 @@ pagination, and reports success only if the server responds successfully. `--env
 to pass `NAME=value` pairs to the container, and `--timeout` sets the wait time for each MCP
 request. Unlike `tools capture`, this command does not modify the catalog.
 
+Image builds, tests, captures, publication inspection, and tooling-image builds require the Docker
+CLI and a reachable Docker engine. The container images include the CLI and Buildx plugin, not the
+engine; provide a host socket or configure `DOCKER_HOST`. The development container checks engine
+connectivity at startup and warns on stderr if it is unavailable. Docker-backed commands also check
+before running and report an actionable error instead of proceeding with an unusable Docker setup.
+
 ## Upstream revisions and build plans
 
 Resolving an upstream ref is read-only. Updating a revision is a separate, explicit operation:

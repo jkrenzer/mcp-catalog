@@ -88,6 +88,7 @@ def test_capture_tools_speaks_mcp_over_stdio_with_pagination(tmp_path, monkeypat
         seen['command'] = command
         return real_popen([sys.executable, str(script)], **kwargs)
 
+    monkeypatch.setattr(tools_capture, 'require_docker_engine', lambda: None)
     monkeypatch.setattr(tools_capture.subprocess, 'Popen', fake_popen)
 
     tools = capture_tools('example/image:1', env={'KEY': 'v'}, timeout=10)
@@ -131,6 +132,7 @@ def test_test_server_image_uses_resolved_image_and_returns_tool_count(monkeypatc
 
 def test_capture_tools_reports_closed_stdout(tmp_path, monkeypatch):
     real_popen = subprocess.Popen
+    monkeypatch.setattr(tools_capture, 'require_docker_engine', lambda: None)
     monkeypatch.setattr(
         tools_capture.subprocess,
         'Popen',

@@ -340,6 +340,7 @@ def test_docker_build_does_not_inherit_git_credentials(monkeypatch):
         observed.update(kwargs)
 
     monkeypatch.setenv('GIT_CONFIG_VALUE_0', 'AUTHORIZATION: basic sensitive')
+    monkeypatch.setattr('mcp_catalog.interfaces.builds.require_docker_engine', lambda: None)
     monkeypatch.setattr('mcp_catalog.interfaces.builds.subprocess.run', run)
 
     _run(['docker', 'buildx', 'build'])

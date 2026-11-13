@@ -10,6 +10,7 @@ from ..branching import build_image_reference, build_server_tag
 from ..logging_config import get_logger
 from ..models import BuildServer, CatalogModel, GitSourceModel
 from .catalog import find_server
+from .docker_runtime import require_docker_engine
 from .docker_entry import image_labels, label_arguments
 
 logger = get_logger(__name__)
@@ -79,6 +80,7 @@ def build_plan(
 def _run(command: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     logger.debug('Running external tool %s', command[0])
     if command[0] == 'docker':
+        require_docker_engine()
         env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_CONFIG_')}
     else:
         env = None

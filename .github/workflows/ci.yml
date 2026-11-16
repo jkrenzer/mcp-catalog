@@ -27,23 +27,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --group dev -e '.[mcp]'
 
-      - name: Validate catalog manifests
-        run: mcp-catalog validate catalog.yaml
-
-      - name: Check formatting
-        run: ruff format --check .
-
-      - name: Lint
-        run: ruff check .
-
-      - name: Type check
-        run: mypy src/mcp_catalog
-
-      - name: Run tests
-        run: pytest
-
-      - name: Check generated schemas
-        run: mcp-catalog schema check schemas
+      - name: Run repository checks
+        run: prek run --all-files
 
       - name: Check conventional PR title
         if: github.event_name == 'pull_request'

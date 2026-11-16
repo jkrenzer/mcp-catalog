@@ -28,22 +28,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --group dev -e '.[mcp]'
 
-      - name: Validate catalog manifests
-        run: mcp-catalog validate catalog.yaml
-
-      - name: Check formatting and lint
-        run: |
-          ruff format --check .
-          ruff check .
-
-      - name: Type check
-        run: mypy src/mcp_catalog
-
-      - name: Run tests
-        run: pytest
-
-      - name: Check generated schemas
-        run: mcp-catalog schema check schemas
+      - name: Run repository checks
+        run: prek run --all-files
 
   publish:
     name: publish images

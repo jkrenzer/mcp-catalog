@@ -1,0 +1,51 @@
+repos:
+  - repo: local
+    hooks:
+      - id: catalog-validate
+        name: Validate catalog manifests
+        entry: mcp-catalog validate catalog.yaml
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: ruff-format
+        name: Check formatting
+        entry: ruff format --check .
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: ruff-check
+        name: Lint
+        entry: ruff check .
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: mypy
+        name: Type check
+        entry: mypy src/mcp_catalog
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: pytest
+        name: Run tests
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: schema-check
+        name: Check generated schemas
+        entry: mcp-catalog schema check schemas
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: commitizen
+        name: Check commit message
+        entry: cz check --allow-abort --commit-msg-file
+        language: system
+        stages: [commit-msg]
+        always_run: true

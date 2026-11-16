@@ -59,3 +59,6 @@ engine is reachable.
 ## Development container
 
 Open the repository in VS Code and select **Reopen in Container** to use the `.devcontainer` configuration. It builds the `development` target, installs the package and development dependencies in `/opt/venv`, and runs the development entrypoint before keeping the container available for an interactive session. The devcontainer includes Docker CLI and Buildx through the Docker-outside-of-Docker feature and uses the host Docker socket, so a Docker engine must be running on the host. This grants the devcontainer control over that engine.
+
+On startup, the development entrypoint installs the `pre-commit` and `commit-msg` Git hooks with
+`prek` when the workspace is a Git worktree.

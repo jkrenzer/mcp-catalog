@@ -40,6 +40,14 @@ def build_image_reference(
     return f'{registry}/{slug}/{server_name}:{server_tag}'
 
 
+def latest_image_reference(image: str) -> str:
+    """Return the moving latest tag for a tagged server image reference."""
+    separator = image.rfind(':')
+    if separator <= image.rfind('/'):
+        raise ValueError(f'Server image reference must include a tag: {image}')
+    return f'{image[:separator]}:latest'
+
+
 def catalog_reference(branch_name: Any, *, registry: str = DEFAULT_REGISTRY) -> str:
     """Return the GHCR catalog reference for the requested branch."""
     slug = branch_namespace(branch_name)

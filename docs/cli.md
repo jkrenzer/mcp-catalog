@@ -167,6 +167,10 @@ mcp-catalog image build example catalog.yaml --branch main --push \
   --cache-to type=gha,scope=example,mode=max
 ```
 
+Pushed server builds publish both the immutable `build-<commit>` reference and the moving
+branch-scoped `latest` tag. `image publish` also pushes both tags for an image already built
+locally.
+
 `--cache-from` may be repeated to import from multiple sources. Push builds enable inline cache
 metadata in the image; tooling image builds also use their branch-scoped `latest` tag as a cache
 source.

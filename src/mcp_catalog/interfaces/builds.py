@@ -6,12 +6,12 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from ..branching import build_image_reference, build_server_tag
+from ..branching import build_image_reference, build_server_tag, latest_image_reference
 from ..logging_config import get_logger
 from ..models import BuildServer, CatalogModel, GitSourceModel
 from .catalog import find_server
-from .docker_runtime import require_docker_engine
 from .docker_entry import image_labels, label_arguments
+from .docker_runtime import require_docker_engine
 
 logger = get_logger(__name__)
 
@@ -186,6 +186,10 @@ def _run_docker_build(
         '--tag',
         image,
     ]
+    if push:
+        latest_image = latest_image_reference(image)
+        if latest_image != image:
+            command.extend(['--tag', latest_image])
     cache_sources = [cache_from] if isinstance(cache_from, str) else cache_from or []
     for cache_source in cache_sources:
         command.extend(['--cache-from', cache_source])
@@ -241,8 +245,13 @@ def build_image_for_server(
 
 
 def publish_image(image: str) -> None:
-    logger.info('Pushing server image %s', image)
+    latest_image = latest_image_reference(image)
+    logger.info('Pushing server image %s and latest alias %s', image, latest_image)
+    if latest_image != image:
+        _run(['docker', 'tag', image, latest_image])
     _run(['docker', 'push', image])
+    if latest_image != image:
+        _run(['docker', 'push', latest_image])
 
 
 def publish_server_image(

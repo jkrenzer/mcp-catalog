@@ -53,6 +53,8 @@ def _run_entrypoint(
             'SERVER_EXIT_CODE': server_exit_code,
             'CONFIG_DIR': str(tmp_path / 'config'),
             'MEMORY_DIR': str(memory_dir),
+            'DATA_DIR': str(memory_dir / 'tenants'),
+            'MULTI_TENANT': 'false',
             'AMEM_BRAIN': str(memory_dir / '.brain.amem'),
             'MCP_SERVER_PROTOCOL': 'stdio',
             'MCP_SERVER_HOST': '127.0.0.1',
@@ -125,6 +127,41 @@ def test_http_protocol_uses_http_transport_and_bind_address(tmp_path):
     config = (tmp_path / 'config/agentic-memory.toml').read_text(encoding='utf-8')
     assert 'transport = "sse"' in config
     assert 'test-token' not in result.stderr
+
+
+def test_multi_tenant_environment_adds_server_flags(tmp_path):
+    data_dir = tmp_path / 'tenant-data'
+
+    result, call_log = _run_entrypoint(
+        tmp_path,
+        MULTI_TENANT='true',
+        DATA_DIR=str(data_dir),
+    )
+
+    assert result.returncode == 0, result.stderr
+    calls = call_log.read_text(encoding='utf-8').splitlines()
+    server_call = next(line for line in calls if line.startswith('server serve '))
+    assert '--multi-tenant' in server_call
+    assert f'--data-dir {data_dir}' in server_call
+
+
+def test_multi_tenant_environment_defaults_to_disabled(tmp_path):
+    result, call_log = _run_entrypoint(tmp_path, MULTI_TENANT='')
+
+    assert result.returncode == 0, result.stderr
+    server_call = next(
+        line for line in call_log.read_text(encoding='utf-8').splitlines()
+        if line.startswith('server serve ')
+    )
+    assert '--multi-tenant' not in server_call
+    assert '--data-dir' not in server_call
+
+
+def test_invalid_multi_tenant_environment_fails_clearly(tmp_path):
+    result, _call_log = _run_entrypoint(tmp_path, MULTI_TENANT='sometimes')
+
+    assert result.returncode == 1
+    assert 'MULTI_TENANT must be one of: false, true' in result.stderr
 
 
 def test_final_export_runs_after_server_exits_with_error_and_logs_lifecycle(tmp_path):

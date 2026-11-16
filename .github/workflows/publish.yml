@@ -114,8 +114,7 @@ jobs:
                   '--image', build['image'],
               ], check=True)
               subprocess.run([
-                  'docker', 'buildx', 'imagetools', 'create',
-                  '--tag', latest_image, build['image'],
+                  'docker', 'buildx', 'imagetools', 'inspect', latest_image,
               ], check=True)
           PY
 

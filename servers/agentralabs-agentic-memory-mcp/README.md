@@ -17,14 +17,20 @@ All settings are environment variables. Empty values fall back to the defaults.
 | `AGENTIC_TOKEN` | unset | Bearer token clients must present in `http` mode. Required for `http`, ignored for `stdio`. |
 | `MCP_SERVER_TOKEN_FILE` | `/token` | File read into `AGENTIC_TOKEN` at start-up when it exists. Bind-mount the token as a file; a missing file is fine, a directory is an error. |
 | `MEMORY_DIR` | `/memory` | Volume that receives exported snapshots. |
-| `EXPORT_MEMORY_FILE`, `EXPORT_MEMORY_INTERVAL` | `/memory/memory.amem`, `60` | Snapshot path (`.amem` or `.json`) and export interval in seconds. Exports also run on shutdown. Set the file to an empty value to disable exports. |
-| `IMPORT_MEMORY_FILE` | the export file | Snapshot (`.amem` or `.json`) imported at start-up. By default the last export is reloaded, so mounting the same memory directory recalls the previous state. A missing or empty file only logs a warning and the server starts with an empty memory. |
+| `MULTI_TENANT` | `false` | Set to `true` to enable upstream per-user brain files. Requires authenticated HTTP requests; use a separate data directory for each deployment. |
+| `DATA_DIR` | `/memory/tenants` | Directory for per-user brain files when `MULTI_TENANT=true`. Keep it on persistent storage. |
+| `EXPORT_MEMORY_FILE`, `EXPORT_MEMORY_INTERVAL` | `/memory/memory.amem`, `60` | Snapshot path (`.amem` or `.json`) and export interval in seconds. Exports also run on shutdown. In multi-tenant mode, use one `*` in the filename (for example `/memory/exports/*.json`) to export each `{DATA_DIR}/{user_id}.amem` tenant file as `{user_id}`. Set the file to an empty value to disable exports. |
+| `IMPORT_MEMORY_FILE` | the export file | Snapshot (`.amem` or `.json`) imported at start-up. In multi-tenant mode, use one `*` in the filename (for example `/memory/imports/*.amem`) to import each match into `{DATA_DIR}/{filename-stem}.amem`. A missing single file warns and starts with empty memory; a glob with no matches warns and imports no tenant files. |
 | `MCP_SERVER_LOG_LEVEL`, `RUST_LOG` | `info` | Log levels of the entrypoint and of the server (`error`, `warn`, `info`, `debug`, `trace`). |
 | `MCP_SERVER_LOG_FILE` | unset | Optional file that receives a copy of everything written to stderr (entrypoint and server logs). Parent directories are created; if the file cannot be written, a warning is logged and the run continues. |
 | `CONFIG_DIR` | `/config` | Volume where the generated server configuration is written. |
 
 The working memory lives inside the container; mounting `/memory` persists it across restarts
 because the exported snapshot is imported again at the next start.
+
+Upstream multi-tenant mode stores each user brain at `{DATA_DIR}/{user_id}.amem`. Tenant glob
+patterns require `MULTI_TENANT=true`; `*` is supported only in the filename, and each import
+filename stem is used as the tenant ID.
 
 ## Standalone over stdio
 
@@ -96,6 +102,48 @@ volumes:
 Compose mounts the secret at `/run/secrets/agentic_token`; set
 `MCP_SERVER_TOKEN_FILE=/run/secrets/agentic_token` in the service environment so the entrypoint
 reads it, and point the devcontainer's MCP client at `http://agentic-memory:3000/mcp`.
+
+### Multi-tenant Compose deployment with persistent snapshots
+
+This standalone setup enables per-user brains and stores both the live tenant files and their
+import/export snapshots on a named volume:
+
+```yaml
+services:
+  agentic-memory:
+    image: ghcr.io/jkrenzer/mcp-catalog/agentralabs-agentic-memory-mcp:<tag>
+    ports:
+      - "3000:3000"
+    environment:
+      MCP_SERVER_PROTOCOL: http
+      MULTI_TENANT: "true"
+      DATA_DIR: /memory/tenants
+      IMPORT_MEMORY_FILE: "/memory/exports/*.amem"
+      EXPORT_MEMORY_FILE: "/memory/exports/*.amem"
+      EXPORT_MEMORY_INTERVAL: "60"
+      MCP_SERVER_TOKEN_FILE: /run/secrets/agentic_token
+    secrets:
+      - agentic_token
+    volumes:
+      - agentic-memory-data:/memory
+
+secrets:
+  agentic_token:
+    file: ./token.txt
+
+volumes:
+  agentic-memory-data:
+```
+
+Create `token.txt` with a secret token, then start the service with `docker compose up -d`.
+The server stores live brains as `/memory/tenants/{user_id}.amem`; periodic and shutdown exports
+write corresponding snapshots to `/memory/exports/{user_id}.amem`. On startup, the import pattern
+restores any snapshots found there. The first run can report that no snapshots match; it starts
+without imported tenant files and creates them as users connect.
+
+The named volume survives container replacement and `docker compose down`; use
+`docker compose down -v` only when you intend to delete the live tenant files and snapshots too.
+Clients connect to `http://localhost:3000/mcp` and must authenticate with the configured token.
 
 ## Docker MCP Toolkit
 

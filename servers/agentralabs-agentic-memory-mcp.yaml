@@ -24,6 +24,11 @@ build:
   platforms: [linux/amd64]
   args: {}
 runtime:
+  env:
+    - name: MULTI_TENANT
+      value: '{{agentralabs-agentic-memory-mcp.multi_tenant}}'
+    - name: DATA_DIR
+      value: '{{agentralabs-agentic-memory-mcp.data_dir}}'
   volumes:
     - '{{agentralabs-agentic-memory-mcp.memory_dir}}:/memory'
 secrets: []
@@ -39,4 +44,12 @@ config:
           add it explicitly (not just a parent!) to the env
           MCP_GATEWAY_DOCKER_BIND_ALLOW_WRITABLE_PATHS at docker mcp
           command invocation!
+      multi_tenant:
+        type: boolean
+        default: false
+        description: Enable per-user memory files. Requires authenticated HTTP requests upstream.
+      data_dir:
+        type: string
+        default: /memory/tenants
+        description: Directory for per-user memory files when multi-tenant mode is enabled.
     required: [memory_dir]

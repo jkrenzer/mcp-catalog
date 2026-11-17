@@ -18,6 +18,8 @@ logger = logging.getLogger('agentic-memory-entrypoint')
 ENVIRONMENT_VARIABLES = (
     'CONFIG_DIR',
     'MEMORY_DIR',
+    'DATA_DIR',
+    'MULTI_TENANT',
     'AMEM_BRAIN',
     'MCP_SERVER_PORT',
     'MCP_SERVER_HOST',
@@ -42,6 +44,8 @@ def _log_environment() -> None:
     defaults = {
         'CONFIG_DIR': '/config',
         'MEMORY_DIR': '/memory',
+        'DATA_DIR': '/memory/tenants',
+        'MULTI_TENANT': 'false',
         'MCP_SERVER_PORT': '3000',
         'MCP_SERVER_HOST': '0.0.0.0',
         'MCP_SERVER_PROTOCOL': 'stdio',
@@ -202,6 +206,33 @@ def _import_memory(import_path: Path, memory_path: Path) -> None:
     logger.info('Memory import completed')
 
 
+def _validate_tenant_glob(pattern: Path, variable_name: str) -> None:
+    if '*' not in pattern.name:
+        raise ValueError(f'{variable_name} must contain * in its filename')
+    if pattern.name.count('*') != 1 or '*' in str(pattern.parent):
+        raise ValueError(f'{variable_name} supports one * wildcard in the filename only')
+
+
+def _tenant_glob_matches(pattern: Path, variable_name: str) -> list[Path]:
+    _validate_tenant_glob(pattern, variable_name)
+    return sorted(pattern.parent.glob(pattern.name))
+
+
+def _import_tenant_memories(import_pattern: Path, data_dir: Path, memory_path: Path) -> None:
+    if import_pattern.suffix.lower() not in {'.amem', '.json'}:
+        raise ValueError('IMPORT_MEMORY_FILE must end in .amem or .json')
+
+    import_paths = _tenant_glob_matches(import_pattern, 'IMPORT_MEMORY_FILE')
+    if not import_paths:
+        logger.warning('No tenant memory files match %s', import_pattern)
+    for import_path in import_paths:
+        if not import_path.is_file():
+            raise ValueError(f'Import memory match is not a file: {import_path}')
+        tenant_path = data_dir / f'{import_path.stem}.amem'
+        _import_memory(import_path, tenant_path)
+    _init_memory(memory_path)
+
+
 def _export_memory(export_path: Path, memory_path: Path) -> None:
     logger.info('Exporting memory from %s to %s', memory_path, export_path)
     export_path.parent.mkdir(parents=True, exist_ok=True)
@@ -226,6 +257,18 @@ def _export_memory(export_path: Path, memory_path: Path) -> None:
         _run_checked(['amem', 'import', str(snapshot_path), str(json_path)])
         os.replace(snapshot_path, export_path)
     logger.info('Memory export completed: %s', export_path)
+
+
+def _export_tenant_memories(export_pattern: Path, data_dir: Path) -> None:
+    if export_pattern.suffix.lower() not in {'.amem', '.json'}:
+        raise ValueError('EXPORT_MEMORY_FILE must end in .amem or .json')
+
+    tenant_paths = sorted(data_dir.glob('*.amem'))
+    if not tenant_paths:
+        logger.warning('No tenant memory files found in %s; nothing to export', data_dir)
+    for tenant_path in tenant_paths:
+        export_path = export_pattern.with_name(export_pattern.name.replace('*', tenant_path.stem))
+        _export_memory(export_path, tenant_path)
 
 
 def _open_log_file(value: str) -> Path | None:
@@ -282,7 +325,13 @@ def _address(host: str, port: str) -> str:
 
 
 def _server_command(
-    protocol: str, memory_path: Path, config_path: Path, address: str, log_level: str
+    protocol: str,
+    memory_path: Path,
+    config_path: Path,
+    address: str,
+    log_level: str,
+    multi_tenant: bool,
+    data_dir: str,
 ) -> list[str]:
     command = ['agentic-memory-mcp', 'serve' if protocol == 'stdio' else 'serve-http']
     if protocol == 'http':
@@ -297,6 +346,8 @@ def _server_command(
             log_level,
         ]
     )
+    if multi_tenant:
+        command.extend(['--multi-tenant', '--data-dir', data_dir])
     return command
 
 
@@ -328,17 +379,33 @@ def main() -> int:
     )
     if protocol == 'http' and not _env('AGENTIC_TOKEN'):
         raise ValueError('AGENTIC_TOKEN is required when MCP_SERVER_PROTOCOL=http')
+    multi_tenant = (
+        _required_choice('MULTI_TENANT', _env('MULTI_TENANT', 'false').lower(), {'false', 'true'})
+        == 'true'
+    )
+    data_dir = _env('DATA_DIR', '/memory/tenants')
+    data_path = Path(data_dir).expanduser().resolve()
 
     config_path = _write_config(config_dir, memory_path, protocol, address, log_level)
     logger.info('Wrote server configuration to %s', config_path)
     import_path = _env('IMPORT_MEMORY_FILE')
     if import_path:
-        _import_memory(Path(import_path).expanduser().resolve(), memory_path)
+        import_path_obj = Path(import_path).expanduser().resolve()
+        if '*' in import_path_obj.name:
+            if not multi_tenant:
+                raise ValueError('IMPORT_MEMORY_FILE glob patterns require MULTI_TENANT=true')
+            _import_tenant_memories(import_path_obj, data_path, memory_path)
+        else:
+            _import_memory(import_path_obj, memory_path)
     else:
         _init_memory(memory_path)
 
     export_value = _env('EXPORT_MEMORY_FILE')
     export_path = Path(export_value).expanduser().resolve() if export_value else None
+    if export_path is not None and '*' in export_path.name and not multi_tenant:
+        raise ValueError('EXPORT_MEMORY_FILE glob patterns require MULTI_TENANT=true')
+    if export_path is not None and '*' in export_path.name:
+        _validate_tenant_glob(export_path, 'EXPORT_MEMORY_FILE')
     try:
         export_interval = int(_env('EXPORT_MEMORY_INTERVAL', '60'))
     except ValueError as error:
@@ -362,7 +429,9 @@ def main() -> int:
 
     signal.signal(signal.SIGTERM, forward_signal)
     signal.signal(signal.SIGINT, forward_signal)
-    command = _server_command(protocol, memory_path, config_path, address, log_level)
+    command = _server_command(
+        protocol, memory_path, config_path, address, log_level, multi_tenant, data_dir
+    )
     logger.info('Starting MCP server: %s', ' '.join(command))
     child = subprocess.Popen(command, stderr=subprocess.PIPE)
     assert child.stderr is not None
@@ -385,7 +454,10 @@ def main() -> int:
                     return_code = child.returncode
                     break
                 try:
-                    _export_memory(export_path, memory_path)
+                    if '*' in export_path.name:
+                        _export_tenant_memories(export_path, data_path)
+                    else:
+                        _export_memory(export_path, memory_path)
                 except (OSError, RuntimeError, ValueError):
                     logger.exception('Periodic memory export failed')
                 next_export = time.monotonic() + export_interval
@@ -399,7 +471,10 @@ def main() -> int:
         )
         if export_path is not None:
             try:
-                _export_memory(export_path, memory_path)
+                if '*' in export_path.name:
+                    _export_tenant_memories(export_path, data_path)
+                else:
+                    _export_memory(export_path, memory_path)
             except (OSError, RuntimeError, ValueError):
                 logger.exception('Final memory export failed')
                 if child.returncode == 0:

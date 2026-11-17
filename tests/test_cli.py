@@ -9,8 +9,9 @@ from typer.testing import CliRunner
 
 import mcp_catalog.cli as cli
 from mcp_catalog import get_logger
+from mcp_catalog.branching import latest_image_reference
 from mcp_catalog.cli import app, main
-from mcp_catalog.interfaces.builds import _run, build_image_for_server
+from mcp_catalog.interfaces.builds import _run, build_image_for_server, publish_image
 from mcp_catalog.interfaces.docker_catalog import (
     CATALOG_ARTIFACT_TYPE,
     catalog_annotations,
@@ -278,7 +279,7 @@ def test_local_build_plan_and_image_build_use_local_context(tmp_path, monkeypatc
     )
 
     plan = build_plan(catalog, catalog_commit='deadbeef', branch='main')
-    build_server_image(server_model, image='example/local:latest', platform='linux/amd64')
+    build_server_image(server_model, image='example/local:build-deadbeef', platform='linux/amd64')
 
     source = plan['builds'][0]['source']
     assert source == {
@@ -290,6 +291,7 @@ def test_local_build_plan_and_image_build_use_local_context(tmp_path, monkeypatc
     assert commands[0][0:3] == ['docker', 'buildx', 'build']
     assert commands[0][-1] == str(context)
     assert commands[0][commands[0].index('--file') + 1] == str(dockerfile)
+    assert commands[0].count('--tag') == 1
 
 
 def test_image_build_push_uses_all_platforms_and_build_cache(tmp_path, monkeypatch):
@@ -312,18 +314,63 @@ def test_image_build_push_uses_all_platforms_and_build_cache(tmp_path, monkeypat
 
     build_server_image(
         model,
-        image='example/local:latest',
+        image='example/local:build-deadbeef',
         push=True,
-        cache_from='type=gha,scope=example',
+        cache_from=['type=gha,scope=example', 'type=registry,ref=example/local:latest'],
         cache_to='type=gha,scope=example,mode=max',
     )
 
     command = commands[0]
     assert '--push' in command
     assert '--load' not in command
+    tags = [command[index + 1] for index, option in enumerate(command) if option == '--tag']
+    assert tags == ['example/local:build-deadbeef', 'example/local:latest']
     assert command[command.index('--platform') + 1] == 'linux/amd64,linux/arm64'
-    assert command[command.index('--cache-from') + 1] == 'type=gha,scope=example'
+    cache_sources = [
+        command[index + 1] for index, option in enumerate(command) if option == '--cache-from'
+    ]
+    assert cache_sources == [
+        'type=gha,scope=example',
+        'type=registry,ref=example/local:latest',
+    ]
     assert command[command.index('--cache-to') + 1] == 'type=gha,scope=example,mode=max'
+    assert 'BUILDKIT_INLINE_CACHE=1' in command
+
+
+def test_publish_image_pushes_build_and_latest_tags(monkeypatch):
+    commands = []
+    monkeypatch.setattr(
+        'mcp_catalog.interfaces.builds._run',
+        lambda command, **kwargs: commands.append(command),
+    )
+
+    publish_image('ghcr.io/example/server:build-deadbeef')
+
+    assert commands == [
+        [
+            'docker',
+            'tag',
+            'ghcr.io/example/server:build-deadbeef',
+            'ghcr.io/example/server:latest',
+        ],
+        ['docker', 'push', 'ghcr.io/example/server:build-deadbeef'],
+        ['docker', 'push', 'ghcr.io/example/server:latest'],
+    ]
+
+
+def test_latest_image_reference_replaces_tag_without_touching_registry_port():
+    assert latest_image_reference('registry.example:5000/team/server:build-deadbeef') == (
+        'registry.example:5000/team/server:latest'
+    )
+
+
+def test_latest_image_reference_requires_a_tag():
+    try:
+        latest_image_reference('ghcr.io/example/server')
+    except ValueError as error:
+        assert 'must include a tag' in str(error)
+    else:
+        raise AssertionError('Expected an untagged image reference to fail')
 
 
 def test_docker_build_does_not_inherit_git_credentials(monkeypatch):
@@ -333,6 +380,7 @@ def test_docker_build_does_not_inherit_git_credentials(monkeypatch):
         observed.update(kwargs)
 
     monkeypatch.setenv('GIT_CONFIG_VALUE_0', 'AUTHORIZATION: basic sensitive')
+    monkeypatch.setattr('mcp_catalog.interfaces.builds.require_docker_engine', lambda: None)
     monkeypatch.setattr('mcp_catalog.interfaces.builds.subprocess.run', run)
 
     _run(['docker', 'buildx', 'build'])
@@ -807,6 +855,41 @@ def test_fastmcp_mirrors_public_cli_commands():
         'branch_slug',
         'self_plan',
         'self_build',
+    }
+
+
+def test_test_server_cli_passes_options_to_mcp_test(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_test_server_image(catalog_path, name, **kwargs):
+        seen.update(catalog_path=catalog_path, name=name, **kwargs)
+        return 2
+
+    monkeypatch.setattr('mcp_catalog.cli.test.test_server_image', fake_test_server_image)
+
+    result = runner.invoke(
+        app,
+        [
+            'test',
+            'server',
+            'example',
+            str(tmp_path / 'catalog.yaml'),
+            '--image',
+            'example/image:1',
+            '--env',
+            'KEY=value',
+            '--timeout',
+            '12',
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert seen == {
+        'catalog_path': tmp_path / 'catalog.yaml',
+        'name': 'example',
+        'image': 'example/image:1',
+        'env': {'KEY': 'value'},
+        'timeout': 12.0,
     }
 
 

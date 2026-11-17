@@ -2,7 +2,18 @@
 
 1. Create a virtual environment.
 2. Install the project and development tools with `python -m pip install --group dev -e '.[mcp]'`.
-3. Before opening a PR, run:
+3. Install the Git hooks:
+
+   ```bash
+   prek install
+   prek install --hook-type commit-msg
+   ```
+
+   The pre-commit hook runs the catalog validation, Ruff, mypy, pytest, and schema checks.
+   The commit-msg hook validates Conventional Commit messages with Commitizen. To run all
+   pre-commit checks manually, use `prek run --all-files`.
+
+4. Before opening a PR, run:
 
    ```bash
    mcp-catalog validate catalog.yaml
@@ -13,8 +24,8 @@
    mcp-catalog schema check schemas
    ```
 
-4. Keep changes compatible with the defined manifest schema and update generated schemas when
+5. Keep changes compatible with the defined manifest schema and update generated schemas when
    needed.
-5. Use a Conventional Commit pull request title. Branch names, including Copilot branch names, do
+6. Use a Conventional Commit pull request title. Branch names, including Copilot branch names, do
    not need a particular format. Squash merge so the PR title is the final commit subject. See
    [CI and publication](docs/ci-publication.md) for the title format and GHCR publishing details.

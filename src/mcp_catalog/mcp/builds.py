@@ -43,7 +43,6 @@ def image_build(
     cache_to: str | None = None,
 ) -> str:
     """Build a pinned build server into the local Docker image store."""
-    require_executable('docker')
     catalog = load_catalog(catalog_path)
     server = next((server for server in catalog.servers if server.name == name), None)
     if not isinstance(server, BuildServer):
@@ -71,7 +70,6 @@ def image_publish(
     catalog_commit: str | None = None,
 ) -> str:
     """Push a previously built server image to its registry."""
-    require_executable('docker')
     image = publish_server_image(
         load_catalog(catalog_path),
         name=name,

@@ -18,6 +18,7 @@ from .publication import app as publication_app
 from .schema import app as schema_app
 from .self_images import app as self_app
 from .servers import app as server_app
+from .test import app as test_app
 from .tools import app as tools_app
 from .upstream import app as upstream_app
 from .validate import app as validation_app
@@ -51,6 +52,7 @@ app.add_typer(schema_app, name='schema')
 app.add_typer(server_app, name='server')
 app.add_typer(upstream_app, name='upstream')
 app.add_typer(tools_app, name='tools')
+app.add_typer(test_app, name='test')
 app.add_typer(builds_app)
 app.add_typer(docker_app, name='docker')
 app.add_typer(catalog_app, name='catalog')

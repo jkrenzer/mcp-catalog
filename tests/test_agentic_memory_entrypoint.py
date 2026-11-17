@@ -53,6 +53,8 @@ def _run_entrypoint(
             'SERVER_EXIT_CODE': server_exit_code,
             'CONFIG_DIR': str(tmp_path / 'config'),
             'MEMORY_DIR': str(memory_dir),
+            'DATA_DIR': str(memory_dir / 'tenants'),
+            'MULTI_TENANT': 'false',
             'AMEM_BRAIN': str(memory_dir / '.brain.amem'),
             'MCP_SERVER_PROTOCOL': 'stdio',
             'MCP_SERVER_HOST': '127.0.0.1',
@@ -125,6 +127,129 @@ def test_http_protocol_uses_http_transport_and_bind_address(tmp_path):
     config = (tmp_path / 'config/agentic-memory.toml').read_text(encoding='utf-8')
     assert 'transport = "sse"' in config
     assert 'test-token' not in result.stderr
+
+
+def test_multi_tenant_environment_adds_server_flags(tmp_path):
+    data_dir = tmp_path / 'tenant-data'
+
+    result, call_log = _run_entrypoint(
+        tmp_path,
+        MULTI_TENANT='true',
+        DATA_DIR=str(data_dir),
+    )
+
+    assert result.returncode == 0, result.stderr
+    calls = call_log.read_text(encoding='utf-8').splitlines()
+    server_call = next(line for line in calls if line.startswith('server serve '))
+    assert '--multi-tenant' in server_call
+    assert f'--data-dir {data_dir}' in server_call
+
+
+def test_multi_tenant_environment_defaults_to_disabled(tmp_path):
+    result, call_log = _run_entrypoint(tmp_path, MULTI_TENANT='')
+
+    assert result.returncode == 0, result.stderr
+    server_call = next(
+        line
+        for line in call_log.read_text(encoding='utf-8').splitlines()
+        if line.startswith('server serve ')
+    )
+    assert '--multi-tenant' not in server_call
+    assert '--data-dir' not in server_call
+
+
+def test_multi_tenant_import_glob_maps_snapshot_stems_to_tenant_files(tmp_path):
+    imports_dir = tmp_path / 'imports'
+    imports_dir.mkdir()
+    (imports_dir / 'user-a.json').write_text('{"tenant": "a"}\n', encoding='utf-8')
+    (imports_dir / 'user-b.json').write_text('{"tenant": "b"}\n', encoding='utf-8')
+    data_dir = tmp_path / 'memory' / 'tenants'
+
+    result, call_log = _run_entrypoint(
+        tmp_path,
+        MULTI_TENANT='true',
+        DATA_DIR=str(data_dir),
+        IMPORT_MEMORY_FILE=str(imports_dir / '*.json'),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (data_dir / 'user-a.amem').read_text(encoding='utf-8') == 'imported'
+    assert (data_dir / 'user-b.amem').read_text(encoding='utf-8') == 'imported'
+    calls = call_log.read_text(encoding='utf-8').splitlines()
+    assert f'amem import {data_dir}/user-a.amem {imports_dir}/user-a.json' in calls
+    assert f'amem import {data_dir}/user-b.amem {imports_dir}/user-b.json' in calls
+
+
+def test_multi_tenant_import_glob_copies_native_tenant_brains(tmp_path):
+    imports_dir = tmp_path / 'imports'
+    imports_dir.mkdir()
+    (imports_dir / 'user-a.amem').write_bytes(b'native-brain-a')
+    (imports_dir / 'user-b.amem').write_bytes(b'native-brain-b')
+    data_dir = tmp_path / 'memory' / 'tenants'
+
+    result, _call_log = _run_entrypoint(
+        tmp_path,
+        MULTI_TENANT='true',
+        DATA_DIR=str(data_dir),
+        IMPORT_MEMORY_FILE=str(imports_dir / '*.amem'),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (data_dir / 'user-a.amem').read_bytes() == b'native-brain-a'
+    assert (data_dir / 'user-b.amem').read_bytes() == b'native-brain-b'
+
+
+def test_multi_tenant_export_glob_writes_one_snapshot_per_tenant(tmp_path):
+    data_dir = tmp_path / 'memory' / 'tenants'
+    data_dir.mkdir(parents=True)
+    (data_dir / 'user-a.amem').write_text('brain-a', encoding='utf-8')
+    (data_dir / 'user-b.amem').write_text('brain-b', encoding='utf-8')
+    export_dir = tmp_path / 'exports'
+    export_pattern = export_dir / '*.json'
+
+    result, call_log = _run_entrypoint(
+        tmp_path,
+        MULTI_TENANT='true',
+        DATA_DIR=str(data_dir),
+        EXPORT_MEMORY_FILE=str(export_pattern),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (export_dir / 'user-a.json').read_text(encoding='utf-8') == '{"snapshot": true}\n'
+    assert (export_dir / 'user-b.json').read_text(encoding='utf-8') == '{"snapshot": true}\n'
+    calls = call_log.read_text(encoding='utf-8').splitlines()
+    assert f'amem export {data_dir}/user-a.amem --pretty' in calls
+    assert f'amem export {data_dir}/user-b.amem --pretty' in calls
+
+
+def test_tenant_globs_require_multi_tenant_mode(tmp_path):
+    pattern = tmp_path / 'imports' / '*.amem'
+
+    result, _call_log = _run_entrypoint(tmp_path, IMPORT_MEMORY_FILE=str(pattern))
+
+    assert result.returncode == 1
+    assert 'IMPORT_MEMORY_FILE glob patterns require MULTI_TENANT=true' in result.stderr
+
+
+def test_multi_tenant_import_glob_without_matches_warns_and_starts(tmp_path):
+    pattern = tmp_path / 'imports' / '*.amem'
+
+    result, call_log = _run_entrypoint(
+        tmp_path,
+        MULTI_TENANT='true',
+        IMPORT_MEMORY_FILE=str(pattern),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert f'WARNING No tenant memory files match {pattern}' in result.stderr
+    assert 'amem init ' in call_log.read_text(encoding='utf-8')
+
+
+def test_invalid_multi_tenant_environment_fails_clearly(tmp_path):
+    result, _call_log = _run_entrypoint(tmp_path, MULTI_TENANT='sometimes')
+
+    assert result.returncode == 1
+    assert 'MULTI_TENANT must be one of: false, true' in result.stderr
 
 
 def test_final_export_runs_after_server_exits_with_error_and_logs_lifecycle(tmp_path):

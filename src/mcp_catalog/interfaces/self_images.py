@@ -133,7 +133,7 @@ def build_self_image(
     repository: str | None = None,
     platform: str | list[str] | None = None,
     push: bool = False,
-    cache_from: str | None = None,
+    cache_from: str | list[str] | None = None,
     cache_to: str | None = None,
 ) -> str:
     """Build one tooling image with Buildx and return its commit-tagged reference."""
@@ -167,10 +167,18 @@ def build_self_image(
     ]
     for tag in tags:
         command.extend(['--tag', tag])
-    if cache_from:
-        command.extend(['--cache-from', cache_from])
+    cache_sources = [cache_from] if isinstance(cache_from, str) else cache_from or []
+    if push:
+        cache_sources = [
+            f'type=registry,ref={tags[1]}',
+            *cache_sources,
+        ]
+    for cache_source in cache_sources:
+        command.extend(['--cache-from', cache_source])
     if cache_to:
         command.extend(['--cache-to', cache_to])
+    if push:
+        command.extend(['--build-arg', 'BUILDKIT_INLINE_CACHE=1'])
     command.extend(
         label_arguments(
             self_image_labels(component, repository=repository, catalog_commit=catalog_commit)

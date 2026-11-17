@@ -1,6 +1,25 @@
 ARG PYTHON_IMAGE=python:3.13-slim-bookworm
 
-FROM ${PYTHON_IMAGE} AS base
+FROM ${PYTHON_IMAGE} AS docker-cli
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    gnupg \
+    && install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg \
+        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && chmod a+r /etc/apt/keyrings/docker.gpg \
+    && printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian %s stable\n' \
+        "$(dpkg --print-architecture)" \
+        "$(sed -n 's/^VERSION_CODENAME=//p' /etc/os-release)" \
+        > /etc/apt/sources.list.d/docker.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin \
+    && apt-get purge -y --auto-remove curl gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM docker-cli AS base
 
 ARG WORKSPACE_DIR=/workspace
 ARG VIRTUAL_ENV=/opt/venv
@@ -30,7 +49,7 @@ COPY --chmod=755 .docker/dev/entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash", "-l"]
 
-FROM ${PYTHON_IMAGE} AS runtime
+FROM docker-cli AS runtime
 
 ARG WORKSPACE_DIR=/workspace
 ARG VIRTUAL_ENV=/opt/venv

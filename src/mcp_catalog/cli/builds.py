@@ -60,10 +60,11 @@ def image_build(
         '--push',
         help='Push directly; defaults to all configured platforms and supports registry caching.',
     ),
-    cache_from: str | None = typer.Option(None, '--cache-from', help='Buildx cache source.'),
+    cache_from: list[str] | None = typer.Option(
+        None, '--cache-from', help='Buildx cache source; may be repeated.'
+    ),
     cache_to: str | None = typer.Option(None, '--cache-to', help='Buildx cache destination.'),
 ) -> None:
-    action(lambda: require_executable('docker'))
     catalog = action(lambda: load_catalog(catalog_path))
     server = action(lambda: find_server(catalog, name))
     if not isinstance(server, BuildServer):
@@ -92,7 +93,6 @@ def image_publish(
     branch: str = typer.Option('main', '--branch'),
     catalog_commit: str | None = typer.Option(None, '--catalog-commit'),
 ) -> None:
-    action(lambda: require_executable('docker'))
     image = action(
         lambda: publish_server_image(
             load_catalog(catalog_path),
